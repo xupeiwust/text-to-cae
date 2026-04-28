@@ -76,6 +76,52 @@ function readJsonFile(filePath) {
   return payload;
 }
 
+function toFiniteNumber(value, fallback = 0) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function summarizeResultMesh(mesh) {
+  const dynamicFrames = Array.isArray(mesh.dynamicFrames) ? mesh.dynamicFrames : [];
+  const modalFrames = Array.isArray(mesh.modalFrames) ? mesh.modalFrames : [];
+  const frames = dynamicFrames.length > 0 ? dynamicFrames : modalFrames;
+  const baseFrames = frames.length > 0 ? frames : [mesh];
+  const history = baseFrames.map((frame, index) => {
+    const fieldRanges = frame?.fieldRanges || {};
+    return {
+      frame: toFiniteNumber(frame?.frame ?? frame?.mode ?? index, index),
+      timeMs: toFiniteNumber(frame?.timeMs, 0),
+      mode: frame?.mode,
+      frequencyHz: Number.isFinite(Number(frame?.frequencyHz)) ? Number(frame.frequencyHz) : undefined,
+      maxMises: toFiniteNumber(fieldRanges.misesMax ?? fieldRanges.valueMax, 0),
+      minMises: toFiniteNumber(fieldRanges.misesMin ?? fieldRanges.valueMin, 0),
+      maxDisplacement: toFiniteNumber(fieldRanges.maxDisplacement, 0),
+      toolX: Number.isFinite(Number(frame?.toolPose?.x)) ? Number(frame.toolPose.x) : undefined,
+      contactRadiusMm: Number.isFinite(Number(frame?.contact?.contactRadiusMm)) ? Number(frame.contact.contactRadiusMm) : undefined,
+      indentationMm: Number.isFinite(Number(frame?.contact?.indentationMm)) ? Number(frame.contact.indentationMm) : undefined,
+    };
+  });
+  const elementTypes = {};
+  const sampleElements = Array.isArray(mesh.elements) ? mesh.elements : [];
+  for (const element of sampleElements) {
+    const type = String(element?.type || mesh.elementType || "Unknown");
+    elementTypes[type] = (elementTypes[type] || 0) + 1;
+  }
+  return {
+    analysisType: mesh.analysisType || "static",
+    source: mesh.source || "",
+    instance: mesh.instance || "",
+    step: mesh.step || "",
+    elementType: mesh.elementType || "",
+    frameCount: baseFrames.length,
+    nodeCount: Array.isArray(mesh.nodes) ? mesh.nodes.length : 0,
+    elementCount: sampleElements.length,
+    elementTypes,
+    fieldRanges: mesh.fieldRanges || {},
+    history,
+  };
+}
+
 function writeJsonFile(filePath, payload) {
   fs.writeFileSync(filePath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
 }
@@ -196,6 +242,15 @@ function attachCaeMiddleware(middlewares) {
       try {
         const resolved = resolveRepoDirectory(requestUrl.searchParams.get("dir"));
         sendJson(res, 200, readJsonFile(path.join(resolved.rootPath, "result_mesh.json")));
+      } catch (error) {
+        sendJson(res, 400, { error: error instanceof Error ? error.message : String(error) });
+      }
+      return;
+    }
+    if (requestUrl.pathname === "/__cae/result-summary") {
+      try {
+        const resolved = resolveRepoDirectory(requestUrl.searchParams.get("dir"));
+        sendJson(res, 200, summarizeResultMesh(readJsonFile(path.join(resolved.rootPath, "result_mesh.json"))));
       } catch (error) {
         sendJson(res, 400, { error: error instanceof Error ? error.message : String(error) });
       }

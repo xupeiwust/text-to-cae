@@ -14,6 +14,7 @@ models/**/*.res
 models/**/*.com
 models/**/*.dat
 models/**/*.msg
+models/**/*.log
 models/**/*.prt
 models/**/*.sta
 models/**/*.env

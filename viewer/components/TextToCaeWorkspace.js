@@ -4,7 +4,7 @@ import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import CaeResultViewer from "./CaeResultViewer";
-import { fetchCaeParameters, fetchCaeProject, runCaeSimulation } from "../lib/caeProjectStore";
+import { fetchCaeParameters, fetchCaeProject, fetchCaeResultSummary, runCaeSimulation } from "../lib/caeProjectStore";
 
 const CAE_CASES = Object.freeze([
   {
@@ -247,6 +247,10 @@ const CAE_TEXT = Object.freeze({
     modelTreeTitle: "Model Tree",
     projectTreeTitle: "Projects",
     metricsTitle: "Result metrics",
+    selectedTreeTitle: "Selected tree item",
+    historyOutputTitle: "History output",
+    fieldOutputTitle: "Field output",
+    noHistoryData: "No result history loaded",
     commandTitle: "Abaqus command",
     modelTreeRoot: "Model Database",
     modelTreeModel: "Model",
@@ -353,6 +357,10 @@ const CAE_TEXT = Object.freeze({
     modelTreeTitle: "\u6a21\u578b\u6811",
     projectTreeTitle: "\u9879\u76ee",
     metricsTitle: "\u7ed3\u679c\u6307\u6807",
+    selectedTreeTitle: "\u5f53\u524d\u9009\u4e2d\u6811\u8282\u70b9",
+    historyOutputTitle: "\u5386\u53f2\u8f93\u51fa",
+    fieldOutputTitle: "\u573a\u8f93\u51fa",
+    noHistoryData: "\u5c1a\u672a\u52a0\u8f7d\u7ed3\u679c\u5386\u53f2",
     commandTitle: "Abaqus \u547d\u4ee4",
     modelTreeRoot: "\u6a21\u578b\u6570\u636e\u5e93",
     modelTreeModel: "\u6a21\u578b",
@@ -608,7 +616,122 @@ function CaeTreeNode({ node, depth = 0, openNodes, selectedNodeId, onToggle, onS
   );
 }
 
-function CaeModelTree({ project, locale, selectedCaseId, cases, onCaseChange }) {
+function MiniHistoryChart({ series, valueKey = "maxMises", color = "#ef4444" }) {
+  const points = Array.isArray(series) ? series.filter((item) => Number.isFinite(Number(item?.[valueKey]))) : [];
+  if (points.length < 2) {
+    return <div className="flex h-28 items-center justify-center rounded-sm border border-[#a8b7c7] bg-white/60 text-[11px] text-slate-500">No curve data</div>;
+  }
+  const values = points.map((item) => Number(item[valueKey]));
+  const minValue = Math.min(...values);
+  const maxValue = Math.max(...values);
+  const valueRange = Math.max(maxValue - minValue, 1e-9);
+  const width = 260;
+  const height = 112;
+  const padding = 14;
+  const polyline = points.map((item, index) => {
+    const x = padding + (index / Math.max(points.length - 1, 1)) * (width - padding * 2);
+    const y = height - padding - ((Number(item[valueKey]) - minValue) / valueRange) * (height - padding * 2);
+    return `${x.toFixed(2)},${y.toFixed(2)}`;
+  }).join(" ");
+  return (
+    <div className="rounded-sm border border-[#a8b7c7] bg-white/70 p-1">
+      <svg viewBox={`0 0 ${width} ${height}`} className="h-28 w-full" role="img" aria-label="history output chart">
+        <rect x="0" y="0" width={width} height={height} fill="#f8fafc" />
+        <line x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} stroke="#64748b" strokeWidth="1" />
+        <line x1={padding} y1={padding} x2={padding} y2={height - padding} stroke="#64748b" strokeWidth="1" />
+        <polyline fill="none" stroke={color} strokeWidth="2" points={polyline} />
+        <text x={padding + 2} y={padding + 8} fill="#334155" fontSize="9">{maxValue.toPrecision(4)}</text>
+        <text x={padding + 2} y={height - padding - 3} fill="#334155" fontSize="9">{minValue.toPrecision(4)}</text>
+      </svg>
+    </div>
+  );
+}
+
+function historyValueForNode(nodeId) {
+  if (nodeId === "history-displacement") {
+    return { key: "maxDisplacement", label: "U max", color: "#2563eb" };
+  }
+  if (nodeId === "history-tool-position") {
+    return { key: "toolX", label: "Tool X", color: "#0f766e" };
+  }
+  if (nodeId === "history-contact-indentation") {
+    return { key: "indentationMm", label: "Indentation", color: "#7c3aed" };
+  }
+  if (nodeId === "history-contact-radius") {
+    return { key: "contactRadiusMm", label: "Contact radius", color: "#0891b2" };
+  }
+  return { key: "maxMises", label: "S, Mises max", color: "#ef4444" };
+}
+
+function TreeResultInspector({ node, project, resultSummary, locale, text }) {
+  const metrics = Array.isArray(project?.outputs?.metrics) ? project.outputs.metrics : [];
+  const nodeId = node?.id || "";
+  const historyConfig = historyValueForNode(nodeId);
+  const history = Array.isArray(resultSummary?.history) ? resultSummary.history : [];
+  const showChart = nodeId.startsWith("history-") || nodeId === "result-main" || nodeId === "field-stress" || nodeId === "field-displacement";
+  const rows = [];
+  if (nodeId.includes("mesh")) {
+    rows.push(["Nodes", resultSummary?.nodeCount || "-"]);
+    rows.push(["Elements", resultSummary?.elementCount || "-"]);
+    rows.push(["Element type", resultSummary?.elementType || project?.inputs?.mesh?.element_family || "-"]);
+  } else if (nodeId.includes("material")) {
+    const material = project?.inputs?.material || {};
+    rows.push(["Material", material.name || "-"]);
+    rows.push(["E", `${material.youngs_modulus_mpa || "-"} MPa`]);
+    rows.push(["nu", material.poissons_ratio || "-"]);
+  } else if (nodeId.includes("job") || nodeId.includes("result") || nodeId.startsWith("history-") || nodeId.startsWith("field-")) {
+    rows.push(["ODB", project?.outputs?.odb?.split("/").pop() || resultSummary?.source || "-"]);
+    rows.push(["Step", resultSummary?.step || "-"]);
+    rows.push(["Frames", resultSummary?.frameCount || "-"]);
+    rows.push(["Peak S, Mises", `${Number(resultSummary?.fieldRanges?.misesMax || 0).toPrecision(5)} MPa`]);
+    rows.push(["Max U", `${Number(resultSummary?.fieldRanges?.maxDisplacement || 0).toPrecision(5)} mm`]);
+  } else {
+    rows.push(["Item", node?.label || "-"]);
+    rows.push(["Detail", node?.detail || "-"]);
+  }
+  return (
+    <section className="space-y-2 rounded-sm border border-[#a8b7c7] bg-[#eef4fb] p-2">
+      <div>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">{text.selectedTreeTitle}</p>
+        <p className="mt-0.5 truncate text-xs font-semibold text-slate-950">{node?.label || "-"}</p>
+        <p className="truncate text-[11px] text-slate-600">{node?.detail || "-"}</p>
+      </div>
+      <div className="grid gap-1">
+        {rows.map(([label, value]) => (
+          <div key={label} className="flex items-center justify-between gap-3 rounded-sm bg-white/65 px-2 py-1 text-[11px]">
+            <span className="text-slate-500">{label}</span>
+            <span className="min-w-0 truncate font-semibold text-slate-900">{value}</span>
+          </div>
+        ))}
+      </div>
+      {showChart ? (
+        <div className="space-y-1">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[11px] font-semibold">{nodeId.startsWith("history-") ? text.historyOutputTitle : text.fieldOutputTitle}</p>
+            <span className="text-[10px] text-slate-500">{historyConfig.label}</span>
+          </div>
+          {history.length > 1 ? (
+            <MiniHistoryChart series={history} valueKey={historyConfig.key} color={historyConfig.color} />
+          ) : (
+            <p className="rounded-sm border border-[#a8b7c7] bg-white/60 p-2 text-[11px] text-slate-600">{text.noHistoryData}</p>
+          )}
+        </div>
+      ) : null}
+      {metrics.length > 0 && (nodeId.includes("result") || nodeId.includes("job")) ? (
+        <div className="grid gap-1">
+          {metrics.slice(0, 3).map((metric) => (
+            <div key={metric.label} className="flex items-center justify-between gap-2 rounded-sm bg-white/65 px-2 py-1 text-[11px]">
+              <span className="truncate text-slate-500">{metricLabel(metric.label, text)}</span>
+              <span className="font-semibold">{formatValue(metric, text)}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function CaeModelTree({ project, locale, selectedCaseId, cases, onCaseChange, onNodeSelect, resultSummary }) {
   const text = CAE_TEXT[locale] || CAE_TEXT.zh;
   const [openNodeIds, setOpenNodeIds] = useState(() => new Set([
     "root",
@@ -623,6 +746,8 @@ function CaeModelTree({ project, locale, selectedCaseId, cases, onCaseChange }) 
     "mesh",
     "jobs",
     "results",
+    "field-output",
+    "history-output",
   ]));
   const [selectedNode, setSelectedNode] = useState(null);
   const geometry = project?.inputs?.geometry || {};
@@ -722,7 +847,32 @@ function CaeModelTree({ project, locale, selectedCaseId, cases, onCaseChange }) 
             id: "results",
             label: text.modelTreeResults,
             detail: odbName,
-            children: [{ id: "result-main", label: odbName, detail: isMilling ? "Transient milling S, Mises and U field output" : isImpact ? "Transient S, Mises and U field output" : isModal ? "Frequencies and U mode-shape field output" : "S, Mises and U field output" }],
+            children: [
+              { id: "result-main", label: odbName, detail: isMilling ? "Transient milling S, Mises and U field output" : isImpact ? "Transient S, Mises and U field output" : isModal ? "Frequencies and U mode-shape field output" : "S, Mises and U field output" },
+              {
+                id: "field-output",
+                label: "Field Output",
+                detail: "Frame field values",
+                children: [
+                  { id: "field-stress", label: "S, Mises", detail: "Element von Mises stress contour" },
+                  { id: "field-displacement", label: "U", detail: "Nodal displacement magnitude" },
+                ],
+              },
+              {
+                id: "history-output",
+                label: "History Output",
+                detail: `${resultSummary?.frameCount || "-"} frames`,
+                children: [
+                  { id: "history-stress", label: "S, Mises max for Model", detail: "Peak stress over displayed frames" },
+                  { id: "history-displacement", label: "U max for Model", detail: "Maximum displacement over displayed frames" },
+                  ...(isMilling ? [{ id: "history-tool-position", label: "Tool path X for Tool", detail: "Cutter position over time" }] : []),
+                  ...(isImpact ? [
+                    { id: "history-contact-indentation", label: "Contact indentation", detail: "Sphere indentation over time" },
+                    { id: "history-contact-radius", label: "Contact radius", detail: "Sphere contact radius over time" },
+                  ] : []),
+                ],
+              },
+            ],
           },
         ],
       },
@@ -732,10 +882,12 @@ function CaeModelTree({ project, locale, selectedCaseId, cases, onCaseChange }) 
   const activeNode = selectedNode || tree.children[0];
   useEffect(() => {
     setSelectedNode(null);
+    onNodeSelect?.(null);
   }, [selectedCaseId]);
 
   const selectNode = (node) => {
     setSelectedNode(node);
+    onNodeSelect?.(node);
     if (node?.caseId && node.caseId !== selectedCaseId) {
       onCaseChange?.(node.caseId);
     }
@@ -789,6 +941,8 @@ export default function TextToCaeWorkspace() {
   const [runMessage, setRunMessage] = useState("");
   const [runningSimulation, setRunningSimulation] = useState(false);
   const [resultVersion, setResultVersion] = useState(0);
+  const [resultSummary, setResultSummary] = useState(null);
+  const [selectedTreeNode, setSelectedTreeNode] = useState(null);
   const [locale, setLocale] = useState(() => {
     if (typeof window === "undefined") {
       return "zh";
@@ -816,6 +970,25 @@ export default function TextToCaeWorkspace() {
   useEffect(() => {
     void loadProject();
   }, [caeDirectory]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setResultSummary(null);
+    fetchCaeResultSummary(caeDirectory)
+      .then((summary) => {
+        if (!cancelled) {
+          setResultSummary(summary);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setResultSummary(null);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [caeDirectory, resultVersion]);
 
   useEffect(() => {
     let cancelled = false;
@@ -917,6 +1090,7 @@ export default function TextToCaeWorkspace() {
     const nextCase = CAE_CASES.find((item) => item.id === nextCaseId) || CAE_CASES[0];
     setSelectedCaseId(nextCase.id);
     setCopyStatus("");
+    setSelectedTreeNode(null);
     if (typeof window !== "undefined") {
       window.localStorage.setItem("text-to-cae-case", nextCase.id);
       const url = new URL(window.location.href);
@@ -990,6 +1164,16 @@ export default function TextToCaeWorkspace() {
             <p className="font-semibold">{text.loadErrorTitle}</p>
             <p>{error}</p>
           </div>
+        ) : null}
+
+        {selectedTreeNode ? (
+          <TreeResultInspector
+            node={selectedTreeNode}
+            project={project}
+            resultSummary={resultSummary}
+            locale={locale}
+            text={text}
+          />
         ) : null}
 
         <section className="space-y-2">
@@ -1112,6 +1296,8 @@ export default function TextToCaeWorkspace() {
             selectedCaseId={selectedCase.id}
             cases={CAE_CASES}
             onCaseChange={handleCaseChange}
+            onNodeSelect={setSelectedTreeNode}
+            resultSummary={resultSummary}
           />
         )}
         leftPanelTitle={text.modelTreeTitle}

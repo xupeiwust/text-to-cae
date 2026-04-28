@@ -35,6 +35,17 @@ export async function fetchCaeResultMesh(directory) {
   return response.json();
 }
 
+export async function fetchCaeResultSummary(directory) {
+  const dir = readCaeDirectoryParam(directory);
+  const response = await fetch(`/__cae/result-summary?dir=${encodeURIComponent(dir)}`, {
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to load CAE result summary ${dir}: ${response.status} ${response.statusText}`);
+  }
+  return response.json();
+}
+
 export async function fetchCaeParameters(directory) {
   const dir = readCaeDirectoryParam(directory);
   const response = await fetch(`/__cae/parameters?dir=${encodeURIComponent(dir)}`, {

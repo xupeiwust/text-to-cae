@@ -48,11 +48,27 @@ const CAE_CASES = Object.freeze([
     },
   },
   {
+    id: "gear-mesh",
+    directory: "models/text-to-cae-gear-mesh",
+    labels: {
+      en: "Gear mesh dynamics",
+      zh: "\u9f7f\u8f6e\u556e\u5408\u52a8\u529b\u5b66",
+    },
+  },
+  {
     id: "bullet-plate",
     directory: "models/text-to-cae-bullet-plate",
     labels: {
       en: "Bullet penetration",
       zh: "\u5b50\u5f39\u7a7f\u900f\u94a2\u677f",
+    },
+  },
+  {
+    id: "f22-flow",
+    directory: "models/text-to-cae-f22-flow",
+    labels: {
+      en: "F-22 flow field",
+      zh: "F-22 \u6d41\u573a",
     },
   },
 ]);
@@ -225,6 +241,134 @@ const PARAMETER_FIELDS = Object.freeze([
     step: 10,
     unit: "",
     labels: { en: "Output frames", zh: "\u8f93\u51fa\u5e27\u6570" },
+  },
+  {
+    key: "length_m",
+    min: 10,
+    max: 30,
+    step: 0.1,
+    unit: "m",
+    labels: { en: "Aircraft length", zh: "\u98de\u673a\u957f\u5ea6" },
+  },
+  {
+    key: "wingspan_m",
+    min: 8,
+    max: 24,
+    step: 0.1,
+    unit: "m",
+    labels: { en: "Wingspan", zh: "\u7ffc\u5c55" },
+  },
+  {
+    key: "mach",
+    min: 0.2,
+    max: 1.4,
+    step: 0.01,
+    unit: "",
+    labels: { en: "Mach number", zh: "\u9a6c\u8d6b\u6570" },
+  },
+  {
+    key: "altitude_m",
+    min: 0,
+    max: 18000,
+    step: 250,
+    unit: "m",
+    labels: { en: "Altitude", zh: "\u9ad8\u5ea6" },
+  },
+  {
+    key: "angle_of_attack_deg",
+    min: -6,
+    max: 18,
+    step: 0.25,
+    unit: "deg",
+    labels: { en: "Angle of attack", zh: "\u8fce\u89d2" },
+  },
+  {
+    key: "sideslip_deg",
+    min: -10,
+    max: 10,
+    step: 0.25,
+    unit: "deg",
+    labels: { en: "Sideslip", zh: "\u4fa7\u6ed1\u89d2" },
+  },
+  {
+    key: "reference_area_m2",
+    min: 20,
+    max: 160,
+    step: 1,
+    unit: "m2",
+    labels: { en: "Reference area", zh: "\u53c2\u8003\u9762\u79ef" },
+  },
+  {
+    key: "dynamic_pressure_pa",
+    min: 1000,
+    max: 90000,
+    step: 500,
+    unit: "Pa",
+    labels: { en: "Dynamic pressure", zh: "\u52a8\u538b" },
+  },
+  {
+    key: "module_mm",
+    min: 0.8,
+    max: 6,
+    step: 0.1,
+    unit: "mm",
+    labels: { en: "Gear module", zh: "\u9f7f\u8f6e\u6a21\u6570" },
+  },
+  {
+    key: "driver_teeth",
+    min: 10,
+    max: 40,
+    step: 1,
+    unit: "",
+    labels: { en: "Driver teeth", zh: "\u4e3b\u52a8\u8f6e\u9f7f\u6570" },
+  },
+  {
+    key: "driven_teeth",
+    min: 10,
+    max: 60,
+    step: 1,
+    unit: "",
+    labels: { en: "Driven teeth", zh: "\u4ece\u52a8\u8f6e\u9f7f\u6570" },
+  },
+  {
+    key: "face_width_mm",
+    min: 4,
+    max: 35,
+    step: 0.5,
+    unit: "mm",
+    labels: { en: "Face width", zh: "\u9f7f\u5bbd" },
+  },
+  {
+    key: "driver_speed_rpm",
+    min: 30,
+    max: 3600,
+    step: 30,
+    unit: "rpm",
+    labels: { en: "Driver speed", zh: "\u4e3b\u52a8\u8f6e\u8f6c\u901f" },
+  },
+  {
+    key: "transmitted_torque_nmm",
+    min: 50,
+    max: 20000,
+    step: 50,
+    unit: "N mm",
+    labels: { en: "Torque", zh: "\u4f20\u9012\u626d\u77e9" },
+  },
+  {
+    key: "pressure_angle_deg",
+    min: 14.5,
+    max: 25,
+    step: 0.5,
+    unit: "deg",
+    labels: { en: "Pressure angle", zh: "\u538b\u529b\u89d2" },
+  },
+  {
+    key: "backlash_mm",
+    min: 0,
+    max: 0.5,
+    step: 0.01,
+    unit: "mm",
+    labels: { en: "Backlash", zh: "\u4fa7\u9699" },
   },
 ]);
 
@@ -1024,14 +1168,22 @@ export default function TextToCaeWorkspace() {
 
   const connectionStatus = project?.connection?.status || "loading";
   const outputStatus = project?.outputs?.status || "loading";
-  const runCommand = `abaqus cae noGUI=${project?.project?.source || `${caeDirectory}/run_abaqus.py`}`;
+  const runCommand = selectedCase.id === "f22-flow"
+    ? `fluent 3ddp -g -i ${project?.project?.source || `${caeDirectory}/f22_external_flow_fluent.jou`}`
+    : `abaqus cae noGUI=${project?.project?.source || `${caeDirectory}/run_abaqus.py`}`;
+  const gearParameterKeys = ["module_mm", "driver_teeth", "driven_teeth", "face_width_mm", "driver_speed_rpm", "transmitted_torque_nmm", "pressure_angle_deg", "backlash_mm", "step_time_s", "output_frames", "seed_size_mm", "youngs_modulus_mpa", "poissons_ratio"];
+  const f22ParameterKeys = ["length_m", "wingspan_m", "mach", "altitude_m", "angle_of_attack_deg", "sideslip_deg", "reference_area_m2", "dynamic_pressure_pa"];
   const visibleParameterFields = selectedCase.id === "sphere-impact"
-    ? PARAMETER_FIELDS.filter((field) => !["hole_radius_mm", "right_displacement_x_mm", "workpiece_length_mm", "workpiece_width_mm", "workpiece_thickness_mm", "tool_diameter_mm", "flute_count", "spindle_speed_rpm", "feed_per_tooth_mm", "axial_depth_mm", "radial_width_mm", "step_time_s", "output_frames"].includes(field.key))
+    ? PARAMETER_FIELDS.filter((field) => !["hole_radius_mm", "right_displacement_x_mm", "workpiece_length_mm", "workpiece_width_mm", "workpiece_thickness_mm", "tool_diameter_mm", "flute_count", "spindle_speed_rpm", "feed_per_tooth_mm", "axial_depth_mm", "radial_width_mm", "step_time_s", "output_frames", ...gearParameterKeys, ...f22ParameterKeys].includes(field.key))
     : selectedCase.id === "milling-3d"
       ? PARAMETER_FIELDS.filter((field) => ["workpiece_length_mm", "workpiece_width_mm", "workpiece_thickness_mm", "tool_diameter_mm", "flute_count", "spindle_speed_rpm", "feed_per_tooth_mm", "axial_depth_mm", "radial_width_mm", "step_time_s", "output_frames", "seed_size_mm", "youngs_modulus_mpa", "poissons_ratio"].includes(field.key))
+    : selectedCase.id === "gear-mesh"
+      ? PARAMETER_FIELDS.filter((field) => gearParameterKeys.includes(field.key))
+    : selectedCase.id === "f22-flow"
+      ? PARAMETER_FIELDS.filter((field) => f22ParameterKeys.includes(field.key))
     : selectedCase.id === "hole-plate-modal"
-      ? PARAMETER_FIELDS.filter((field) => !["right_displacement_x_mm", "ball_radius_mm", "impact_velocity_mps", "workpiece_length_mm", "workpiece_width_mm", "workpiece_thickness_mm", "tool_diameter_mm", "flute_count", "spindle_speed_rpm", "feed_per_tooth_mm", "axial_depth_mm", "radial_width_mm", "step_time_s", "output_frames"].includes(field.key))
-      : PARAMETER_FIELDS.filter((field) => !["ball_radius_mm", "impact_velocity_mps", "workpiece_length_mm", "workpiece_width_mm", "workpiece_thickness_mm", "tool_diameter_mm", "flute_count", "spindle_speed_rpm", "feed_per_tooth_mm", "axial_depth_mm", "radial_width_mm", "step_time_s", "output_frames"].includes(field.key));
+      ? PARAMETER_FIELDS.filter((field) => !["right_displacement_x_mm", "ball_radius_mm", "impact_velocity_mps", "workpiece_length_mm", "workpiece_width_mm", "workpiece_thickness_mm", "tool_diameter_mm", "flute_count", "spindle_speed_rpm", "feed_per_tooth_mm", "axial_depth_mm", "radial_width_mm", "step_time_s", "output_frames", ...gearParameterKeys, ...f22ParameterKeys].includes(field.key))
+      : PARAMETER_FIELDS.filter((field) => !["ball_radius_mm", "impact_velocity_mps", "workpiece_length_mm", "workpiece_width_mm", "workpiece_thickness_mm", "tool_diameter_mm", "flute_count", "spindle_speed_rpm", "feed_per_tooth_mm", "axial_depth_mm", "radial_width_mm", "step_time_s", "output_frames", ...gearParameterKeys, ...f22ParameterKeys].includes(field.key));
 
   const copyRunCommand = async () => {
     try {

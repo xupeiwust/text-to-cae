@@ -19,8 +19,8 @@
           "zh": "\u51e0\u4f55"
         },
         "value": {
-          "en": "120 x 60 x 1 mm plate, 12 mm radius center hole",
-          "zh": "120 x 60 x 1 mm \u5e73\u677f\uff0c\u4e2d\u5fc3\u5706\u5b54\u534a\u5f84 12 mm"
+          "en": "120 x 60 x 1 mm plate, 22.8 mm radius center hole",
+          "zh": "120 x 60 x 1 mm \u5e73\u677f\uff0c\u4e2d\u5fc3\u5706\u5b54\u534a\u5f84 22.8 mm"
         }
       },
       {
@@ -58,7 +58,7 @@
       "length_mm": 120.0,
       "width_mm": 60.0,
       "thickness_mm": 1.0,
-      "hole_radius_mm": 12.0
+      "hole_radius_mm": 22.8
     },
     "material": {
       "name": "Steel",
@@ -83,25 +83,25 @@
     "metrics": [
       {
         "label": "Mode 1 frequency",
-        "value": 190.15,
+        "value": 170.72,
         "unit": "Hz",
         "state": "complete"
       },
       {
         "label": "Mode 2 frequency",
-        "value": 898.61,
+        "value": 776.42,
         "unit": "Hz",
         "state": "complete"
       },
       {
         "label": "Mode 3 frequency",
-        "value": 1191.7,
+        "value": 1189.0,
         "unit": "Hz",
         "state": "complete"
       },
       {
         "label": "Mode 4 frequency",
-        "value": 2878.3,
+        "value": 2045.1,
         "unit": "Hz",
         "state": "complete"
       }
@@ -109,33 +109,33 @@
     "modes": [
       {
         "mode": 1,
-        "frequency_hz": 190.15,
-        "max_raw_umag": 273.58671439355965
+        "frequency_hz": 170.72,
+        "max_raw_umag": 296.4818440780496
       },
       {
         "mode": 2,
-        "frequency_hz": 898.61,
-        "max_raw_umag": 350.86815080162
+        "frequency_hz": 776.42,
+        "max_raw_umag": 370.4220957949885
       },
       {
         "mode": 3,
-        "frequency_hz": 1191.7,
-        "max_raw_umag": 262.7063229959466
+        "frequency_hz": 1189.0,
+        "max_raw_umag": 304.28287853229455
       },
       {
         "mode": 4,
-        "frequency_hz": 2878.3,
-        "max_raw_umag": 255.02057031801198
+        "frequency_hz": 2045.1,
+        "max_raw_umag": 247.94429086434496
       },
       {
         "mode": 5,
-        "frequency_hz": 2933.3,
-        "max_raw_umag": 361.4636026409887
+        "frequency_hz": 2846.0,
+        "max_raw_umag": 390.91640322470636
       },
       {
         "mode": 6,
-        "frequency_hz": 3310.9,
-        "max_raw_umag": 271.8595684897561
+        "frequency_hz": 3067.8,
+        "max_raw_umag": 265.11569678942357
       }
     ]
   },

@@ -209,6 +209,7 @@ function buildResultSurface(mesh) {
         labels,
         mises: toFiniteNumber(element.mises, 0),
         color: element.color || "",
+        showEdges: element.showEdges !== false,
       });
     }
   }
@@ -247,24 +248,26 @@ function buildResultSurface(mesh) {
       indices.push(baseIndex, baseIndex + 1, baseIndex + 2, baseIndex, baseIndex + 2, baseIndex + 3);
     }
 
-    for (let index = 0; index < face.labels.length; index += 1) {
-      const aLabel = face.labels[index];
-      const bLabel = face.labels[(index + 1) % face.labels.length];
-      const edgeKey = faceKey([aLabel, bLabel]);
-      if (linePairs.has(edgeKey)) {
-        continue;
+    if (face.showEdges) {
+      for (let index = 0; index < face.labels.length; index += 1) {
+        const aLabel = face.labels[index];
+        const bLabel = face.labels[(index + 1) % face.labels.length];
+        const edgeKey = faceKey([aLabel, bLabel]);
+        if (linePairs.has(edgeKey)) {
+          continue;
+        }
+        linePairs.add(edgeKey);
+        const a = nodeByLabel.get(aLabel);
+        const b = nodeByLabel.get(bLabel);
+        const aPoint = Array.isArray(a?.deformed) ? a.deformed : a?.coordinates;
+        const bPoint = Array.isArray(b?.deformed) ? b.deformed : b?.coordinates;
+        linePositions.push(
+          toFiniteNumber(aPoint?.[0], 0), toFiniteNumber(aPoint?.[1], 0), toFiniteNumber(aPoint?.[2], 0),
+          toFiniteNumber(bPoint?.[0], 0), toFiniteNumber(bPoint?.[1], 0), toFiniteNumber(bPoint?.[2], 0),
+        );
       }
-      linePairs.add(edgeKey);
-      const a = nodeByLabel.get(aLabel);
-      const b = nodeByLabel.get(bLabel);
-      const aPoint = Array.isArray(a?.deformed) ? a.deformed : a?.coordinates;
-      const bPoint = Array.isArray(b?.deformed) ? b.deformed : b?.coordinates;
-      linePositions.push(
-        toFiniteNumber(aPoint?.[0], 0), toFiniteNumber(aPoint?.[1], 0), toFiniteNumber(aPoint?.[2], 0),
-        toFiniteNumber(bPoint?.[0], 0), toFiniteNumber(bPoint?.[1], 0), toFiniteNumber(bPoint?.[2], 0),
-      );
+      appendInteriorGridLines(facePoints, surfaceGridSubdivisions, linePositions);
     }
-    appendInteriorGridLines(facePoints, surfaceGridSubdivisions, linePositions);
   }
 
   const surfaceGeometry = new THREE.BufferGeometry();

@@ -23,6 +23,10 @@ const RUNNABLE_CAE_CASES = new Map([
     solveScript: "milling_abaqus.py",
     exportScript: "export_milling_mesh.py",
   }],
+  ["models/text-to-cae-gear-mesh", {
+    solveScript: "gear_mesh_abaqus.py",
+    exportScript: "export_gear_mesh.py",
+  }],
   ["models/text-to-cae-bullet-plate", {
     solveScript: "bullet_plate_penetration_abaqus.py",
     exportScript: "export_bullet_mesh.py",
@@ -149,7 +153,38 @@ function parameterNumber(value, fallback, { min, max }) {
 }
 
 function normalizeCaeParameters(rawParameters = {}, caeDir = "") {
+  const isF22Flow = caeDir === "models/text-to-cae-f22-flow";
   const isMilling = caeDir === "models/text-to-cae-milling-3d";
+  const isGearMesh = caeDir === "models/text-to-cae-gear-mesh";
+  if (isF22Flow) {
+    return {
+      length_m: parameterNumber(rawParameters.length_m, 18.9, { min: 10, max: 30 }),
+      wingspan_m: parameterNumber(rawParameters.wingspan_m, 13.6, { min: 8, max: 24 }),
+      mach: parameterNumber(rawParameters.mach, 0.85, { min: 0.2, max: 1.4 }),
+      altitude_m: parameterNumber(rawParameters.altitude_m, 10000, { min: 0, max: 18000 }),
+      angle_of_attack_deg: parameterNumber(rawParameters.angle_of_attack_deg, 3, { min: -6, max: 18 }),
+      sideslip_deg: parameterNumber(rawParameters.sideslip_deg, 0, { min: -10, max: 10 }),
+      reference_area_m2: parameterNumber(rawParameters.reference_area_m2, 78, { min: 20, max: 160 }),
+      dynamic_pressure_pa: parameterNumber(rawParameters.dynamic_pressure_pa, 14800, { min: 1000, max: 90000 }),
+    };
+  }
+  if (isGearMesh) {
+    return {
+      module_mm: parameterNumber(rawParameters.module_mm, 2.5, { min: 0.8, max: 6 }),
+      driver_teeth: Math.round(parameterNumber(rawParameters.driver_teeth, 18, { min: 10, max: 40 })),
+      driven_teeth: Math.round(parameterNumber(rawParameters.driven_teeth, 30, { min: 10, max: 60 })),
+      face_width_mm: parameterNumber(rawParameters.face_width_mm, 12, { min: 4, max: 35 }),
+      driver_speed_rpm: parameterNumber(rawParameters.driver_speed_rpm, 900, { min: 30, max: 3600 }),
+      transmitted_torque_nmm: parameterNumber(rawParameters.transmitted_torque_nmm, 1800, { min: 50, max: 20000 }),
+      pressure_angle_deg: parameterNumber(rawParameters.pressure_angle_deg, 20, { min: 14.5, max: 25 }),
+      backlash_mm: parameterNumber(rawParameters.backlash_mm, 0.08, { min: 0, max: 0.5 }),
+      step_time_s: parameterNumber(rawParameters.step_time_s, 0.04, { min: 0.005, max: 0.12 }),
+      output_frames: Math.round(parameterNumber(rawParameters.output_frames, 120, { min: 40, max: 240 })),
+      seed_size_mm: parameterNumber(rawParameters.seed_size_mm, 1.2, { min: 0.4, max: 5 }),
+      youngs_modulus_mpa: parameterNumber(rawParameters.youngs_modulus_mpa, 210000, { min: 1000, max: 500000 }),
+      poissons_ratio: parameterNumber(rawParameters.poissons_ratio, 0.3, { min: 0.01, max: 0.49 }),
+    };
+  }
   if (isMilling) {
     const workpieceLength = parameterNumber(rawParameters.workpiece_length_mm, 56, { min: 24, max: 80 });
     const workpieceWidth = parameterNumber(rawParameters.workpiece_width_mm, 24, { min: 10, max: 45 });

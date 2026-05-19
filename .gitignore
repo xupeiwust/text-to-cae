@@ -26,3 +26,14 @@ models/text-to-cae-milling-3d/result_mesh.json
 models/text-to-cae-cutting/
 **/__pycache__/
 *.pyc
+*.log
+MCP/**/.env
+MCP/**/.venv/
+MCP/**/jobs/
+MCP/**/workbench_queue/
+MCP/**/*.wbpj
+MCP/**/*.wbpz
+MCP/**/*.rst
+MCP/**/*.db
+MCP/**/*.err
+MCP/**/*.out

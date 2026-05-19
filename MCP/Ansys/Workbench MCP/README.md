@@ -24,6 +24,129 @@ py -m venv .venv
 
 Copy `.env.example` to `.env` and set your local ANSYS paths.
 
+## MCP Client Setup Prompts
+
+Copy one of these prompts into the MCP-capable client you want to use. Replace `<repo>` with the absolute path to this folder, for example `C:\path\to\text-to-cae\MCP\Ansys\Workbench MCP`.
+
+### Codex
+
+```text
+Install this local ANSYS Workbench MCP server for Codex.
+
+Project folder:
+<repo>
+
+Please configure Codex MCP with a stdio server named `ansys-workbench`:
+- command: <repo>\.venv\Scripts\python.exe
+- args: ["<repo>\server.py"]
+- cwd: <repo>
+- env:
+  - ANSYS_ROOT=<your ANSYS install root, for example C:\Program Files\ANSYS Inc\v261>
+  - WORKBENCH_MCP_ROOT=<repo>
+  - WORKBENCH_MCP_QUEUE_ROOT=<repo>\workbench_queue
+  - WORKBENCH_MCP_HOST=127.0.0.1
+  - WORKBENCH_MCP_PORT=9885
+
+If the virtual environment does not exist, create it and install the project with:
+py -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -U pip
+.\.venv\Scripts\python.exe -m pip install -e .[mechanical]
+
+After configuring the server, verify it by listing MCP tools and then run `workbench_detect_tool`.
+```
+
+### Claude Code
+
+```text
+Add this local ANSYS Workbench MCP server to Claude Code.
+
+Project folder:
+<repo>
+
+Use a stdio MCP server named `ansys-workbench`:
+- command: <repo>\.venv\Scripts\python.exe
+- args: ["<repo>\server.py"]
+- cwd: <repo>
+- env:
+  - ANSYS_ROOT=<your ANSYS install root>
+  - WORKBENCH_MCP_ROOT=<repo>
+  - WORKBENCH_MCP_QUEUE_ROOT=<repo>\workbench_queue
+  - WORKBENCH_MCP_PORT=9885
+
+If dependencies are missing, create `.venv` and run `pip install -e .[mechanical]`.
+Then restart Claude Code and confirm the Workbench MCP tools are available.
+```
+
+### Claude Desktop
+
+```text
+Help me add this local ANSYS Workbench MCP server to Claude Desktop.
+
+Project folder:
+<repo>
+
+Create or update Claude Desktop's MCP configuration with a stdio server:
+
+"ansys-workbench": {
+  "command": "<repo>\\.venv\\Scripts\\python.exe",
+  "args": ["<repo>\\server.py"],
+  "cwd": "<repo>",
+  "env": {
+    "ANSYS_ROOT": "<your ANSYS install root>",
+    "WORKBENCH_MCP_ROOT": "<repo>",
+    "WORKBENCH_MCP_QUEUE_ROOT": "<repo>\\workbench_queue",
+    "WORKBENCH_MCP_HOST": "127.0.0.1",
+    "WORKBENCH_MCP_PORT": "9885"
+  }
+}
+
+Create the virtual environment first if needed, then restart Claude Desktop and verify that the Workbench MCP tools appear.
+```
+
+### Cursor
+
+```text
+Configure this local ANSYS Workbench MCP server in Cursor.
+
+Project folder:
+<repo>
+
+Add a stdio MCP server named `ansys-workbench` using:
+- command: <repo>\.venv\Scripts\python.exe
+- args: ["<repo>\server.py"]
+- cwd: <repo>
+- environment:
+  - ANSYS_ROOT=<your ANSYS install root>
+  - WORKBENCH_MCP_ROOT=<repo>
+  - WORKBENCH_MCP_QUEUE_ROOT=<repo>\workbench_queue
+  - WORKBENCH_MCP_HOST=127.0.0.1
+  - WORKBENCH_MCP_PORT=9885
+
+If `.venv` is missing, create it and install dependencies with `pip install -e .[mechanical]`.
+After saving the MCP settings, reload Cursor and run a tool discovery check.
+```
+
+### Generic MCP Client
+
+```json
+{
+  "mcpServers": {
+    "ansys-workbench": {
+      "command": "<repo>\\.venv\\Scripts\\python.exe",
+      "args": ["<repo>\\server.py"],
+      "cwd": "<repo>",
+      "env": {
+        "ANSYS_ROOT": "<your ANSYS install root>",
+        "WORKBENCH_MCP_ROOT": "<repo>",
+        "WORKBENCH_MCP_QUEUE_ROOT": "<repo>\\workbench_queue",
+        "WORKBENCH_MCP_HOST": "127.0.0.1",
+        "WORKBENCH_MCP_PORT": "9885"
+      }
+    }
+  }
+}
+```
+
 ## Configure Mechanical ACT
 
 Install the plugin files into the ANSYS ACT extensions directory for your version, for example:

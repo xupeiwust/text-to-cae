@@ -1,15 +1,18 @@
-# Text to CAE
+# CAE Agent Hub
 
 **Language:** English | [中文](README.zh-CN.md)
 
-![Text to CAE preview](assets/text-to-cae-preview.png)
+![CAE Agent Hub preview](assets/text-to-cae-preview.png)
 
-Text to CAE is a local Abaqus simulation workspace with a browser-based result viewer. It is designed for workflows where an AI coding client, such as Codex, Cursor, or Claude Desktop, writes and edits Abaqus Python scripts, runs Abaqus/CAE, exports solver results, and displays those results in an interactive web UI.
+CAE Agent Hub is a workspace for MCP servers, agent skills, automation scripts, and browser viewers for mainstream engineering simulation software. It is designed for workflows where an AI coding client, such as Codex, Cursor, or Claude Desktop, connects to real CAE tools, writes or edits solver scripts, runs verified local simulations, exports results, and displays those results in an interactive web UI.
 
-The project connects three layers:
+The project is expanding across solver ecosystems, including Abaqus and Ansys products such as Fluent, Workbench Mechanical, and AEDT/HFSS. The original Text to CAE viewer remains as the browser-based result viewer and demo workflow inside this broader hub.
 
-- **Abaqus/CAE** builds models, runs jobs, and writes ODB result databases.
-- **Abaqus MCP** lets an AI client inspect and control a live Abaqus/CAE session.
+The project connects four layers:
+
+- **CAE applications** build models, mesh, solve, and produce native result databases.
+- **MCP servers** let AI clients inspect and control live solver sessions.
+- **Agent skills** package repeatable setup, modeling, solving, and postprocessing workflows.
 - **Text to CAE Viewer** loads exported `result_mesh.json`, project metadata, parameters, time frames, contours, and model trees in the browser.
 
 Repository:
@@ -18,7 +21,7 @@ Repository:
 https://github.com/Cai-aa/text-to-cae
 ```
 
-Companion Abaqus MCP repository:
+Related Abaqus MCP repository:
 
 ```text
 https://github.com/Cai-aa/abaqus-mcp
@@ -28,9 +31,9 @@ https://github.com/Cai-aa/abaqus-mcp
 
 ```text
 Codex or another MCP-capable AI client
-  -> connects to Abaqus/CAE through Abaqus MCP
-  -> creates or edits Abaqus Python scripts
-  -> asks Abaqus to build, mesh, solve, and read ODB data
+  -> connects to a live CAE application through an MCP server
+  -> creates or edits solver automation scripts
+  -> asks the solver to build, mesh, solve, and read result data
   -> exports result_mesh.json
   -> opens the Text to CAE browser viewer
 ```
@@ -38,18 +41,18 @@ Codex or another MCP-capable AI client
 This keeps the responsibilities clear:
 
 - The AI client handles natural-language changes, code editing, debugging, and automation.
-- Abaqus/CAE handles the real solver work.
+- The CAE application handles the real solver work.
 - The browser viewer handles fast interactive inspection of CAE results.
 
 ## Requirements
 
 - Windows
 - Node.js and npm
-- Abaqus/CAE for solver-backed runs
-- Python available to Abaqus scripts
-- Optional: an MCP-capable AI client plus [Abaqus MCP](https://github.com/Cai-aa/abaqus-mcp)
+- A supported CAE application for solver-backed runs, such as Abaqus/CAE or Ansys tools
+- Python available to the relevant solver scripts
+- Optional: an MCP-capable AI client plus one of the included MCP servers or [Abaqus MCP](https://github.com/Cai-aa/abaqus-mcp)
 
-The viewer can display any case that already has a `result_mesh.json`. Abaqus is only required when you want to regenerate solver output or run a case from the browser.
+The viewer can display any case that already has a `result_mesh.json`. A solver installation is only required when you want to regenerate solver output or run a case from the browser.
 
 ## Install and Run the Viewer
 

@@ -1,15 +1,18 @@
-# Text to CAE 使用教程
+# CAE Agent Hub 使用教程
 
 **语言：** [English](README.md) | 中文
 
-![Text to CAE 效果展示](assets/text-to-cae-preview.png)
+![CAE Agent Hub 效果展示](assets/text-to-cae-preview.png)
 
-Text to CAE 是一个本地运行的 Abaqus 仿真工作区，带有浏览器结果查看器。它适合用 Codex、Cursor、Claude Desktop 等 AI 客户端编写和修改 Abaqus Python 脚本，然后通过 Abaqus/CAE 求解，并把结果导出到浏览器中交互查看。
+CAE Agent Hub 是一个面向主流工程仿真软件的 MCP server、Agent Skill、自动化脚本和浏览器结果查看器工作区。它适合用 Codex、Cursor、Claude Desktop 等 AI 客户端连接真实 CAE 工具，编写或修改求解器脚本，运行经过验证的本地仿真，导出结果，并在浏览器中交互查看。
 
-项目连接三层能力：
+这个项目会持续扩展到不同求解器生态，包括 Abaqus，以及 Ansys Fluent、Workbench Mechanical、AEDT/HFSS 等 Ansys 工具。原来的 Text to CAE viewer 仍然作为这个更大 Hub 里的浏览器结果查看器和演示工作流保留。
 
-- **Abaqus/CAE**：负责真实建模、网格划分、提交作业和生成 ODB 结果数据库。
-- **Abaqus MCP**：让 AI 客户端可以检查和控制当前 Abaqus/CAE 会话。
+项目连接四层能力：
+
+- **CAE 应用程序**：负责真实建模、网格划分、求解和生成原生结果数据库。
+- **MCP servers**：让 AI 客户端可以检查和控制正在运行的求解器会话。
+- **Agent Skills**：封装可复用的安装、建模、求解和后处理工作流。
 - **Text to CAE Viewer**：在浏览器中加载 `result_mesh.json`、项目元数据、参数、时间帧、云图和模型树。
 
 项目仓库：
@@ -18,7 +21,7 @@ Text to CAE 是一个本地运行的 Abaqus 仿真工作区，带有浏览器结
 https://github.com/Cai-aa/text-to-cae
 ```
 
-配套 Abaqus MCP 仓库：
+相关 Abaqus MCP 仓库：
 
 ```text
 https://github.com/Cai-aa/abaqus-mcp
@@ -28,9 +31,9 @@ https://github.com/Cai-aa/abaqus-mcp
 
 ```text
 Codex 或其他支持 MCP 的 AI 客户端
-  -> 通过 Abaqus MCP 连接 Abaqus/CAE
-  -> 创建或修改 Abaqus Python 脚本
-  -> 让 Abaqus 建模、划分网格、求解、读取 ODB
+  -> 通过 MCP server 连接正在运行的 CAE 应用
+  -> 创建或修改求解器自动化脚本
+  -> 让求解器建模、划分网格、求解、读取结果数据
   -> 导出 result_mesh.json
   -> 打开 Text to CAE 浏览器 viewer 查看结果
 ```
@@ -38,18 +41,18 @@ Codex 或其他支持 MCP 的 AI 客户端
 这个分工比较清晰：
 
 - AI 客户端负责自然语言理解、代码修改、脚本调试和自动化。
-- Abaqus/CAE 负责真实求解。
+- CAE 应用程序负责真实求解。
 - 浏览器 viewer 负责快速交互式检查 CAE 结果。
 
 ## 环境要求
 
 - Windows
 - Node.js 和 npm
-- Abaqus/CAE，用于真实求解
-- Abaqus 脚本可用的 Python 环境
-- 可选：支持 MCP 的 AI 客户端，以及 [Abaqus MCP](https://github.com/Cai-aa/abaqus-mcp)
+- 支持的 CAE 应用程序，例如 Abaqus/CAE 或 Ansys 工具，用于真实求解
+- 相关求解器脚本可用的 Python 环境
+- 可选：支持 MCP 的 AI 客户端，以及本仓库内的 MCP server 或 [Abaqus MCP](https://github.com/Cai-aa/abaqus-mcp)
 
-如果某个案例已经包含 `result_mesh.json`，viewer 可以直接显示。只有需要重新求解或从浏览器触发 Abaqus 时，才必须安装 Abaqus。
+如果某个案例已经包含 `result_mesh.json`，viewer 可以直接显示。只有需要重新求解或从浏览器触发求解器时，才必须安装对应 CAE 软件。
 
 ## 安装并启动 Viewer
 

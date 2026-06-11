@@ -27,8 +27,16 @@ models/text-to-cae-cutting/
 **/__pycache__/
 *.pyc
 *.log
+.venv-pyaedt/
+.venv-pyaedt-codex/
+pyaedt_runs/
 MCP/**/.env
 MCP/**/.venv/
+MCP/**/*.egg-info/
+MCP/**/aedt_projects/
+MCP/**/*.aedtresults/
+MCP/**/*.aedt.auto
+MCP/**/*.aedt.lock
 MCP/**/jobs/
 MCP/**/workbench_queue/
 MCP/**/*.wbpj
@@ -40,6 +48,8 @@ MCP/**/*.out
 MCP/**/commands/
 MCP/**/results/
 MCP/**/scripts/
+!MCP/Ansys/AEDT MCP/scripts/
+!MCP/Ansys/AEDT MCP/scripts/**
 MCP/**/screenshots/
 MCP/**/status.json
 MCP/**/status.json.tmp

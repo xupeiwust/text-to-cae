@@ -32,6 +32,7 @@ models/text-to-cae-cutting/
 pyaedt_runs/
 MCP/**/.env
 MCP/**/.venv/
+MCP/**/.venv.broken-*/
 MCP/**/*.egg-info/
 MCP/**/aedt_projects/
 MCP/**/*.aedtresults/

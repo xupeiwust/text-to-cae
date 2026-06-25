@@ -21,7 +21,9 @@ if ([string]::IsNullOrWhiteSpace($BridgeLoader)) {
 }
 
 $BridgeLoader = (Resolve-Path -LiteralPath $BridgeLoader).Path
+$ProjectVenv = Join-Path $RepoRoot ".venv"
 $ProjectPython = Join-Path $RepoRoot ".venv\Scripts\python.exe"
+$ProjectVenvConfig = Join-Path $ProjectVenv "pyvenv.cfg"
 
 function Write-Step {
     param([string]$Message)
@@ -113,6 +115,13 @@ function Wait-AedtDesktop {
 function Invoke-BridgeProbe {
     if (-not (Test-Path -LiteralPath $ProjectPython)) {
         Write-Warning "Project Python was not found at $ProjectPython; bridge probe skipped."
+        return
+    }
+
+    if (-not (Test-Path -LiteralPath $ProjectVenvConfig)) {
+        Write-Warning "Project Python exists but the virtual environment is incomplete: $ProjectVenvConfig was not found."
+        Write-Warning "Recreate it from $RepoRoot with: py -m venv .venv; .\.venv\Scripts\python.exe -m pip install -e ."
+        Write-Warning "Bridge probe skipped."
         return
     }
 

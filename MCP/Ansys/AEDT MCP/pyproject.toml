@@ -1,7 +1,7 @@
 [project]
 name = "ansys-aedt-mcp"
 version = "0.1.0"
-description = "MCP server and raw TCP bridge for Ansys Electronics Desktop"
+description = "PyAEDT-backed MCP server for Ansys Electronics Desktop"
 requires-python = ">=3.10"
 dependencies = [
     "mcp>=1.0",
@@ -17,9 +17,6 @@ pythonpath = ["."]
 
 [tool.setuptools]
 py-modules = [
-    "aedt_mcp_bridge",
-    "aedt_socket_protocol",
-    "stop_mcp",
     "aedt_target",
     "worker_protocol",
     "pyaedt_backend",

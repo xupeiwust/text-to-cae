@@ -1,168 +1,101 @@
 # Ansys AEDT MCP
 
-Part of CAE Agent Hub. This module provides the Ansys Electronics Desktop / HFSS MCP bridge for the hub's Ansys tool family.
+This CAE Agent Hub module lets MCP clients such as Codex control Ansys Electronics Desktop 2026 R1 through PyAEDT.
 
-This folder contains a portable MCP server plus a raw TCP JSON bridge for Ansys Electronics Desktop 2026 R1. MCP-capable clients such as Codex can connect to a live AEDT session, inspect projects, create HFSS designs, save projects, and execute small AEDT Python snippets.
-
-The bridge follows the same overall pattern as this repository's Abaqus MCP:
+## Architecture
 
 ```text
-MCP client
-  <stdio MCP>
-mcp_server.py
-  <local raw TCP JSON, default 127.0.0.1:48252>
-aedt_mcp_bridge.py running inside AEDT
-  <oDesktop / oProject / oDesign scripting API>
-Ansys Electronics Desktop / HFSS
+Codex -> FastMCP stdio server -> one short-lived PyAEDT worker -> explicit AEDT PID or gRPC port
 ```
 
-It does not use HTTP or WebSocket. The socket protocol is newline-delimited JSON over localhost.
-
-## Contents
-
-- `mcp_server.py`: external stdio MCP server.
-- `aedt_mcp_bridge.py`: script to run inside Ansys Electronics Desktop.
-- `reload_bridge_in_aedt.py`: utility script for reloading the bridge in an already running AEDT session.
-- `aedt_socket_protocol.py`: shared raw TCP JSON protocol helpers.
-- `stop_mcp.py`: asks the running AEDT bridge to stop.
-- `scripts/launch_aedt_with_mcp_bridge.ps1`: optional legacy launcher for starting or attaching to AEDT from outside the UI.
-- `scripts/install_aedt_mcp_autostart.ps1`: optional legacy shortcut installer; not used by the current recommended setup.
-- `scripts/install_aedt_toolkit_button.ps1`: installs the native AEDT Toolkit/Automation ribbon gallery dropdown for HFSS and Project contexts.
-- `scripts/start_aedt_mcp_bridge_in_aedt.py`: menu-friendly AEDT script entry point for manual start/reload.
-- `scripts/stop_aedt_mcp_bridge_in_aedt.py`: menu-friendly AEDT script entry point for manual stop.
-- `.env.example`: bridge endpoint and timeout variables.
-- `examples/mcp_config.example.json`: generic MCP client configuration.
-- `tests/`: protocol unit tests that do not require AEDT.
+No MCP script, socket server, extension, or background thread runs inside AEDT. Each operation starts one external worker, connects to exactly one target, performs one command, calls `release_desktop(close_projects=False, close_on_exit=False)`, and exits. The MCP process never retains an AEDT Automation object.
 
 ## Install
 
-From this folder:
+Use Python 3.10 or newer:
 
 ```powershell
-py -m venv .venv
+py -3.10 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -U pip
 .\.venv\Scripts\python.exe -m pip install -e .
 ```
 
-If `py` resolves to the wrong Python on this machine, use the Codex runtime Python or another known-good Python 3.10+ executable.
+The package pins PyAEDT 1.1.0, which supports AEDT 2026 R1.
 
-## Legacy Launcher
+Copy the relevant values from `.env.example` into the MCP client environment. `AEDT_INSTALL_DIR` must contain `ansysedt.exe` when `launch_aedt` is used.
 
-The external launcher shortcut is no longer the recommended default because AEDT now has a native `AEDT MCP` dropdown on the Automation ribbon.
+## MCP configuration
 
-The old shortcut installer is kept only as an optional helper:
+Use `examples/mcp_config.example.json` and replace `<repo>` with the absolute path to this directory.
 
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\scripts\install_aedt_mcp_autostart.ps1"
-```
+## Session selection
 
-To test the launcher against an already-open AEDT session without creating a shortcut:
+There is no implicit AEDT session.
 
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\scripts\launch_aedt_with_mcp_bridge.ps1" -NoLaunch
-```
+1. Call `list_aedt_sessions`.
+2. Choose one process PID or one gRPC port.
+3. Pass exactly one of `pid` or `port` to every targeted tool.
 
-## AEDT Automation Dropdown
+When multiple AEDT sessions are open, the server never chooses the newest or foreground window. Port targeting is preferred for sessions created by `launch_aedt`.
 
-Install the native AEDT Toolkit gallery dropdown:
+## Workflows
 
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\scripts\install_aedt_toolkit_button.ps1"
-```
+### Attach to an AEDT window opened by the user
 
-This updates the AEDT Toolkit `TabConfig.xml` files for `HFSS` and `Project`, after creating `.bak_aedt_mcp` backups. The ribbon entry is:
+1. Start graphical AEDT 2026 R1 normally.
+2. Call `list_aedt_sessions` and identify its PID.
+3. Call `check_aedt_connection(pid=<PID>)`.
+4. Use the same PID for project and analysis tools.
 
-```text
-AEDT MCP
-  Start AEDT MCP Bridge
-  Stop AEDT MCP Bridge
-```
+### Launch a visible gRPC AEDT session
 
-If AEDT is already open, run this from the live bridge or restart AEDT:
+1. Call `launch_aedt(port=0)`.
+2. Keep the returned PID and port.
+3. Target subsequent tools with the returned port.
 
-```python
-oDesktop.RefreshToolkitUI()
-```
-
-After refresh, look on the `Automation` ribbon tab, in the `Codex MCP` panel. Open `AEDT MCP`, then use `Stop AEDT MCP Bridge` before closing AEDT if the bridge is running.
-
-## Start The AEDT Bridge
-
-Manual start is still available:
-
-1. Open Ansys Electronics Desktop 2026 R1.
-2. In AEDT, run `scripts\start_aedt_mcp_bridge_in_aedt.py` or `reload_bridge_in_aedt.py` from the script editor / script menu.
-3. Confirm the AEDT message/log says:
-
-```text
-AEDT MCP bridge listening on 127.0.0.1:48252
-```
-
-Optional environment variables:
-
-```text
-AEDT_MCP_HOST=127.0.0.1
-AEDT_MCP_PORT=48252
-AEDT_MCP_TIMEOUT=60
-AEDT_MCP_TOKEN=
-AEDT_MCP_LOG=%TEMP%\aedt_mcp_socket_bridge.log
-```
-
-Keep the host as `127.0.0.1` unless you intentionally need remote access.
-
-## MCP Client Setup
-
-Replace `<repo>` with the absolute path to this folder.
-
-```text
-<your-checkout>\MCP\Ansys\AEDT MCP
-```
-
-```json
-{
-  "mcpServers": {
-    "ansys-aedt": {
-      "command": "<repo>\\.venv\\Scripts\\python.exe",
-      "args": ["<repo>\\mcp_server.py"],
-      "cwd": "<repo>",
-      "env": {
-        "AEDT_MCP_HOST": "127.0.0.1",
-        "AEDT_MCP_PORT": "48252",
-        "AEDT_MCP_TIMEOUT": "60"
-      }
-    }
-  }
-}
-```
+The launcher uses `ansysedt.exe -grpcsrv <port>` without non-graphical flags. If readiness times out, AEDT is left running for inspection; the MCP never force-closes it.
 
 ## Tools
 
-- `ping`: verify the AEDT-side bridge and return live session telemetry.
-- `check_aedt_connection`: concise human-readable connection status.
-- `run_script`: execute AEDT Python code in the bridge namespace; assign `result` to return structured data.
-- `get_project_info`: inspect active project/design state.
-- `create_hfss_design`: create or activate an HFSS design.
-- `save_project`: save the active AEDT project.
+- `list_aedt_sessions`: discover AEDT PIDs and local listener ports without attaching.
+- `launch_aedt`: launch visible AEDT 2026 R1 in gRPC mode.
+- `check_aedt_connection`: run a real PyAEDT probe for one explicit target.
+- `release_connection`: perform an attach/release smoke test without closing AEDT.
+- `get_project_info`: inspect active project and design metadata.
+- `create_hfss_design`: create or activate a named HFSS design.
+- `save_project`: save the active project or save it to an explicit path.
+- `start_analysis`: start a named HFSS setup; non-blocking by default.
+- `get_analysis_status`: query running state and available setups.
 
 Resources:
 
-- `aedt://status`
-- `aedt://agent-instructions`
+- `aedt://status`: discovery-only status; it does not attach to AEDT.
+- `aedt://agent-instructions`: targeting and lifecycle rules.
 
-## Recommended Workflow
+## Failure isolation
 
-1. Start AEDT from the normal Ansys Electronics Desktop shortcut.
-2. In AEDT, open the `Automation` ribbon, open `AEDT MCP`, and click `Start AEDT MCP Bridge`.
-3. From Codex, call `ping`.
-4. Call `get_project_info`.
-5. Use small `run_script` chunks to inspect uncertain AEDT API behavior.
-6. Use higher-level tools such as `create_hfss_design` once the current session state is clear.
-7. Open `AEDT MCP` and click `Stop AEDT MCP Bridge` before closing AEDT to release the socket listener cleanly.
+- Every Worker has a timeout.
+- A timed-out Worker is terminated; AEDT is not terminated.
+- Calls to the same target are serialized.
+- Calls to different explicit targets can run independently.
+- PyAEDT diagnostics are written under `AEDT_LOG_DIR` and never mixed with MCP stdio JSON.
 
-## Notes
+## Remove the legacy toolbar
 
-This is the first raw TCP bridge implementation for AEDT in this repository. It intentionally keeps the bridge small and external-MCP-friendly. The current AEDT entry point is installed through the Toolkit `TabConfig.xml` files.
+Older versions installed `Start AEDT MCP Bridge` and `Stop AEDT MCP Bridge` in AEDT. They are not used by this implementation. To remove only those known entries:
 
-Later versions can add more HFSS-specific MCP tools for geometry, materials, boundaries, excitations, setups, solves, and reports.
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\scripts\remove_legacy_aedt_mcp_toolbar.ps1" -AedtRoot "G:\ANSYS206\ANSYS Inc\v261\AnsysEM"
+```
 
-The project does not include Ansys binaries, licenses, user projects, solver results, or private local configuration.
+The script preserves `TabConfig.xml.bak_aedt_mcp` and unrelated Toolkit entries. Restart AEDT after cleanup.
+
+## Verification
+
+Offline tests:
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s tests -v
+```
+
+Live acceptance testing must verify both PID attachment and gRPC launch mode, including normal AEDT window close without the "being used by another application, script or extension wizard" dialog.

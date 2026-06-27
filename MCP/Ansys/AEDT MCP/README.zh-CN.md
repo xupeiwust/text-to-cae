@@ -1,166 +1,101 @@
 # Ansys AEDT MCP
 
-这是 CAE Agent Hub 的一部分。本模块提供 Hub 中 Ansys 工具族的 Ansys Electronics Desktop / HFSS MCP bridge。
+该模块通过 PyAEDT 让 Codex 等 MCP 客户端控制 Ansys Electronics Desktop 2026 R1。
 
-这个目录包含一个可移植的 MCP server，以及一个用于 Ansys Electronics Desktop 2026 R1 的 raw TCP JSON bridge。Codex 等支持 MCP 的客户端可以通过它连接正在运行的 AEDT 会话，查看工程、创建 HFSS design、保存工程，并执行小段 AEDT Python 脚本。
-
-整体结构参考本仓库的 Abaqus MCP：
+## 架构
 
 ```text
-MCP client
-  <stdio MCP>
-mcp_server.py
-  <local raw TCP JSON, default 127.0.0.1:48252>
-在 AEDT 内运行的 aedt_mcp_bridge.py
-  <oDesktop / oProject / oDesign scripting API>
-Ansys Electronics Desktop / HFSS
+Codex -> FastMCP stdio server -> 单次 PyAEDT Worker -> 明确的 AEDT PID 或 gRPC port
 ```
 
-它不使用 HTTP，也不使用 WebSocket。桥接层是 localhost 上的换行分隔 JSON TCP 协议。
-
-## 内容
-
-- `mcp_server.py`：外部 stdio MCP server。
-- `aedt_mcp_bridge.py`：在 AEDT 内运行的 bridge 脚本。
-- `reload_bridge_in_aedt.py`：在已运行 AEDT 会话中重载 bridge 的辅助脚本。
-- `aedt_socket_protocol.py`：raw TCP JSON 协议辅助函数。
-- `stop_mcp.py`：请求正在运行的 AEDT bridge 停止。
-- `scripts/launch_aedt_with_mcp_bridge.ps1`：可选的旧版外部 launcher，用于从 AEDT 外部启动或连接 AEDT。
-- `scripts/install_aedt_mcp_autostart.ps1`：可选的旧版快捷方式安装脚本；当前推荐流程不再使用它。
-- `scripts/install_aedt_toolkit_button.ps1`：给 HFSS 和 Project 上下文安装 AEDT 原生 Toolkit / Automation ribbon gallery 下拉按钮。
-- `scripts/start_aedt_mcp_bridge_in_aedt.py`：适合放到 AEDT 脚本菜单里手动启动/重载 bridge 的入口。
-- `.env.example`：bridge 端口、超时和 token 配置。
-- `examples/mcp_config.example.json`：通用 MCP 客户端配置示例。
-- `tests/`：不依赖 AEDT 的协议单元测试。
+AEDT 内部不再运行 MCP 脚本、socket server、扩展或后台线程。每次操作启动一个外部 Worker，连接一个明确目标，执行一个命令，调用 `release_desktop(close_projects=False, close_on_exit=False)`，然后退出。MCP 进程不会长期持有 AEDT Automation 对象。
 
 ## 安装
 
-在本目录下执行：
+使用 Python 3.10 或更高版本：
 
 ```powershell
-py -m venv .venv
+py -3.10 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -U pip
 .\.venv\Scripts\python.exe -m pip install -e .
 ```
 
-如果这台机器上的 `py` 或 `python` 解析不稳定，可以改用 Codex runtime Python 或其他确定可用的 Python 3.10+。
+项目固定使用 PyAEDT 1.1.0，支持 AEDT 2026 R1。
 
-## 旧版 Launcher
+根据 `.env.example` 配置 MCP 客户端。使用 `launch_aedt` 时，`AEDT_INSTALL_DIR` 必须指向包含 `ansysedt.exe` 的目录。
 
-外部 launcher 快捷方式已经不是当前推荐默认入口，因为 AEDT 里已经有原生的 `AEDT MCP` 下拉按钮。
+## MCP 配置
 
-旧版快捷方式安装脚本保留为可选辅助工具：
+参考 `examples/mcp_config.example.json`，将 `<repo>` 替换成本目录的绝对路径。
 
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\scripts\install_aedt_mcp_autostart.ps1"
-```
+## 会话选择
 
-如果 AEDT 已经打开，可以这样只做连接和重载验证，不创建快捷方式：
+系统没有隐式默认 AEDT 会话。
 
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\scripts\launch_aedt_with_mcp_bridge.ps1" -NoLaunch
-```
+1. 调用 `list_aedt_sessions`。
+2. 明确选择一个进程 PID 或 gRPC port。
+3. 每个操作工具必须且只能传入 `pid` 或 `port` 之一。
 
-## AEDT Automation 下拉按钮
+同时打开多个 AEDT 时，不会自动选择最近启动或前台窗口。通过 `launch_aedt` 启动的会话优先使用返回的 gRPC port。
 
-安装 AEDT 原生 Toolkit gallery 下拉按钮：
+## 使用方式
 
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\scripts\install_aedt_toolkit_button.ps1"
-```
+### 连接用户手动打开的 AEDT
 
-这个脚本会修改 `HFSS` 和 `Project` 两个 Toolkit 的 `TabConfig.xml`，并先创建 `.bak_aedt_mcp` 备份。ribbon 入口是：
+1. 正常启动图形化 AEDT 2026 R1。
+2. 调用 `list_aedt_sessions` 找到目标 PID。
+3. 调用 `check_aedt_connection(pid=<PID>)`。
+4. 后续工程和求解工具继续使用同一个 PID。
 
-```text
-AEDT MCP
-  Start AEDT MCP Bridge
-  Stop AEDT MCP Bridge
-```
+### 启动可见的 gRPC AEDT
 
-如果 AEDT 已经打开，可以通过 live bridge 执行下面这句刷新，或者直接重启 AEDT：
+1. 调用 `launch_aedt(port=0)`。
+2. 保存返回的 PID 和 port。
+3. 后续工具使用该 port。
 
-```python
-oDesktop.RefreshToolkitUI()
-```
-
-刷新后在 `Automation` ribbon tab 的 `Codex MCP` panel 下查看。打开 `AEDT MCP`，即可点击 `Start AEDT MCP Bridge` 或 `Stop AEDT MCP Bridge`。
-
-## 在 AEDT 内手动启动 Bridge
-
-Automation 按钮之外，也可以手动启动：
-
-1. 打开 Ansys Electronics Desktop 2026 R1。
-2. 在 AEDT 的 Script Editor 或脚本菜单中运行 `scripts\start_aedt_mcp_bridge_in_aedt.py`，也可以直接运行 `reload_bridge_in_aedt.py`。
-3. 确认 AEDT 消息或日志里出现：
-
-```text
-AEDT MCP bridge listening on 127.0.0.1:48252
-```
-
-可选环境变量：
-
-```text
-AEDT_MCP_HOST=127.0.0.1
-AEDT_MCP_PORT=48252
-AEDT_MCP_TIMEOUT=60
-AEDT_MCP_TOKEN=
-AEDT_MCP_LOG=%TEMP%\aedt_mcp_socket_bridge.log
-```
-
-除非明确需要远程访问，否则 `AEDT_MCP_HOST` 保持 `127.0.0.1`。
-
-## MCP 客户端配置
-
-把 `<repo>` 替换成本目录的绝对路径。
-
-```text
-<your-checkout>\MCP\Ansys\AEDT MCP
-```
-
-```json
-{
-  "mcpServers": {
-    "ansys-aedt": {
-      "command": "<repo>\\.venv\\Scripts\\python.exe",
-      "args": ["<repo>\\mcp_server.py"],
-      "cwd": "<repo>",
-      "env": {
-        "AEDT_MCP_HOST": "127.0.0.1",
-        "AEDT_MCP_PORT": "48252",
-        "AEDT_MCP_TIMEOUT": "60"
-      }
-    }
-  }
-}
-```
+启动命令为 `ansysedt.exe -grpcsrv <port>`，不会添加非图形模式参数。若启动超时，AEDT 会保留运行供检查，MCP 不会强制结束它。
 
 ## 工具
 
-- `ping`：验证 AEDT 侧 bridge，并返回 live session telemetry。
-- `check_aedt_connection`：返回简洁的人类可读连接状态。
-- `run_script`：在 bridge 命名空间中执行 AEDT Python；设置 `result` 变量来返回结构化数据。
-- `get_project_info`：查看当前工程和 design 状态。
-- `create_hfss_design`：创建或激活 HFSS design。
-- `save_project`：保存当前 AEDT 工程。
+- `list_aedt_sessions`：只读发现 AEDT PID 和本地监听端口，不附加会话。
+- `launch_aedt`：启动图形化 AEDT 2026 R1 gRPC 会话。
+- `check_aedt_connection`：对明确目标执行真实 PyAEDT 探测。
+- `release_connection`：执行连接和释放验证，不关闭 AEDT。
+- `get_project_info`：读取活动工程和设计信息。
+- `create_hfss_design`：创建或激活指定 HFSS design。
+- `save_project`：保存当前工程或另存到指定路径。
+- `start_analysis`：启动指定 HFSS setup，默认非阻塞。
+- `get_analysis_status`：查询求解状态和 setup 列表。
 
 资源：
 
-- `aedt://status`
-- `aedt://agent-instructions`
+- `aedt://status`：只做会话发现，不附加 AEDT。
+- `aedt://agent-instructions`：目标选择和生命周期规则。
 
-## 推荐工作流
+## 故障隔离
 
-1. 从普通 Ansys Electronics Desktop 快捷方式启动 AEDT。
-2. 在 AEDT 的 `Automation` ribbon 中打开 `AEDT MCP`，点击 `Start AEDT MCP Bridge`。
-3. 从 Codex 调用 `ping`。
-4. 调用 `get_project_info`。
-5. 对不确定的 AEDT API 行为，先用小段 `run_script` 探测。
-6. 当前会话状态明确后，再使用 `create_hfss_design` 等高层工具。
+- 每个 Worker 都有超时。
+- Worker 超时只结束 Worker，不结束 AEDT。
+- 同一目标的操作串行执行。
+- 不同明确目标可以独立执行。
+- PyAEDT 日志写入 `AEDT_LOG_DIR`，不会污染 MCP stdio JSON。
 
-## 说明
+## 清理旧工具栏
 
-这是本仓库里 AEDT raw TCP bridge 的第一版实现。当前重点是让外部 MCP 和已打开的 AEDT 稳定通讯。当前 AEDT 内部入口通过 Toolkit `TabConfig.xml` 安装到 Automation ribbon。
+旧版曾在 AEDT 中安装 `Start AEDT MCP Bridge` 和 `Stop AEDT MCP Bridge`。新版不再使用这些按钮。可运行：
 
-后续可以继续增加 HFSS 专用 MCP 工具，例如几何、材料、边界、激励、setup、求解和报告导出。
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\scripts\remove_legacy_aedt_mcp_toolbar.ps1" -AedtRoot "G:\ANSYS206\ANSYS Inc\v261\AnsysEM"
+```
 
-本项目不包含 Ansys 二进制文件、许可证、用户工程、求解结果或本机私有配置。
+脚本只移除已知旧按钮和脚本，保留 `TabConfig.xml.bak_aedt_mcp` 以及其他 Toolkit 配置。清理后重启 AEDT。
+
+## 验证
+
+离线测试：
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s tests -v
+```
+
+实机验收必须同时覆盖 PID 附加和 gRPC 启动，并确认正常关闭 AEDT 时不再出现“being used by another application, script or extension wizard”弹窗。

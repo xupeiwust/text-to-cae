@@ -12,6 +12,8 @@ No MCP script, socket server, extension, or background thread runs inside AEDT. 
 
 This lifecycle is required for AEDT 2026 R1 gRPC sessions: ending the PyAEDT client after every command also ends that session's gRPC listener. Keeping the connection in an external broker avoids rebuilding AEDT for each tool call without leaving Toolkit/Automation code running in AEDT.
 
+On Windows, the broker watches only its target AEDT process. If the AEDT busy dialog appears, or the main window changes from visible to closed, the broker interprets that as an explicit user close request and calls AEDT `QuitApplication()` through the existing PyAEDT session. The broker then exits. This prevents a connected broker from leaving a hidden AEDT process behind.
+
 ## Install
 
 Use Python 3.10 or newer:
@@ -44,6 +46,7 @@ The server never chooses the newest or foreground AEDT window. A successful prob
 - Project and analysis tools reuse that broker.
 - `release_connection` disconnects the broker without requesting project or AEDT closure.
 - MCP shutdown and broker stdin EOF also release all connections.
+- Closing the AEDT window triggers `QuitApplication()` and terminates that target's broker.
 - A timed-out broker is terminated; the AEDT process is never force-terminated.
 
 For an MCP-launched session, prefer the port returned by `launch_aedt`. For a user-opened AEDT window, select its PID from `list_aedt_sessions`.

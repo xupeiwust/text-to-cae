@@ -18,6 +18,7 @@ pythonpath = ["."]
 [tool.setuptools]
 py-modules = [
     "aedt_target",
+    "aedt_close_watcher",
     "worker_protocol",
     "pyaedt_backend",
     "pyaedt_worker",

@@ -5,6 +5,7 @@ import os
 import sys
 from typing import Any, Callable
 
+from aedt_close_watcher import AedtCloseWatcher
 from pyaedt_backend import BackendCommandError, PyAedtBackend
 from worker_protocol import WorkerProtocolError, WorkerRequest, WorkerResponse
 
@@ -31,6 +32,20 @@ def run_request_line(
         return WorkerResponse.failure(request.request_id, "backend_error", str(exc)), 1
 
 
+def handle_close_intent(
+    backend: Any,
+    reason: str,
+    *,
+    exit_fn: Callable[[int], Any] = os._exit,
+) -> None:
+    sys.stderr.write(f"AEDT close intent detected: {reason}\n")
+    try:
+        backend.close_for_user_request()
+    finally:
+        sys.stderr.flush()
+        exit_fn(0)
+
+
 def run_stream(
     input_stream: Any,
     output_stream: Any,
@@ -38,6 +53,11 @@ def run_stream(
     backend_factory: Callable[[], Any] = PyAedtBackend,
 ) -> int:
     backend = backend_factory()
+    watcher = AedtCloseWatcher(
+        session_pid=lambda: getattr(backend, "session_pid", None),
+        on_close_intent=lambda reason: handle_close_intent(backend, reason),
+    )
+    watcher.start()
     released = False
     try:
         for payload in input_stream:
@@ -76,6 +96,7 @@ def run_stream(
             output_stream.flush()
         return 0
     finally:
+        watcher.stop()
         if not released:
             try:
                 with contextlib.redirect_stdout(sys.stderr):

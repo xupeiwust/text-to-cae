@@ -8,7 +8,12 @@ import time
 import unittest
 
 from aedt_target import AedtTarget
-from pyaedt_worker import exit_without_pyaedt_cleanup, run_request_line, run_stream
+from pyaedt_worker import (
+    exit_without_pyaedt_cleanup,
+    handle_close_intent,
+    run_request_line,
+    run_stream,
+)
 from worker_client import (
     WorkerClient,
     WorkerProcessError,
@@ -25,6 +30,8 @@ class FakeBackend:
         self.error = error
         self.calls = []
         self.release_calls = 0
+        self.close_calls = 0
+        self.session_pid = 4321
 
     def execute(self, target, command, arguments):
         self.calls.append((target, command, arguments))
@@ -36,8 +43,28 @@ class FakeBackend:
         self.release_calls += 1
         return True
 
+    def close_for_user_request(self):
+        self.close_calls += 1
+        return True
+
 
 class WorkerEntryPointTests(unittest.TestCase):
+    def test_close_intent_gracefully_closes_aedt_before_worker_exit(self):
+        events = []
+
+        class OrderedBackend(FakeBackend):
+            def close_for_user_request(self):
+                events.append("close")
+                return True
+
+        handle_close_intent(
+            OrderedBackend(),
+            "main_window_closed",
+            exit_fn=lambda code: events.append(f"exit:{code}"),
+        )
+
+        self.assertEqual(events, ["close", "exit:0"])
+
     def test_stream_reuses_backend_until_explicit_release(self):
         target = AedtTarget("port", 50051)
         first = WorkerRequest.create("ping", target, {}, 5.0)

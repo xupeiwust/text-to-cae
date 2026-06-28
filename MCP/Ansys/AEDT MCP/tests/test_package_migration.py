@@ -34,6 +34,7 @@ class PackageMigrationTests(unittest.TestCase):
                 self.assertIn("broker", content.lower())
                 self.assertIn("release_desktop", content)
                 self.assertIn("release_connection", content)
+                self.assertIn("QuitApplication", content)
                 self.assertNotIn("aedt_mcp_bridge.py", content)
                 self.assertNotIn("click `Start AEDT MCP Bridge`", content)
 
@@ -51,6 +52,11 @@ class PackageMigrationTests(unittest.TestCase):
         self.assertIn("AEDT_VERSION", content)
         self.assertNotIn("AEDT_MCP_HOST", content)
         self.assertNotIn("AEDT_MCP_PORT", content)
+
+    def test_close_watcher_is_packaged(self):
+        content = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+
+        self.assertIn('"aedt_close_watcher"', content)
 
     def test_legacy_toolbar_cleanup_script_is_present_and_scoped(self):
         content = (ROOT / "scripts" / "remove_legacy_aedt_mcp_toolbar.ps1").read_text(

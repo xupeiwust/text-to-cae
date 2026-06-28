@@ -30,6 +30,8 @@ class FakeDesktop:
         self.fail_projects = fail_projects
         self.releases = []
         self.saved = []
+        self.quit_calls = 0
+        self.odesktop = self
         self.aedt_version_id = "2026.1"
         self.aedt_process_id = kwargs.get("aedt_process_id", 4321)
         self.port = kwargs.get("port", 0)
@@ -64,6 +66,10 @@ class FakeDesktop:
 
     def release_desktop(self, close_projects=False, close_on_exit=False):
         self.releases.append((close_projects, close_on_exit))
+        return True
+
+    def QuitApplication(self):
+        self.quit_calls += 1
         return True
 
 
@@ -136,6 +142,16 @@ class PyAedtBackendTests(unittest.TestCase):
         self.backend.execute(target, "project_info", {})
 
         self.assertEqual(len(self.desktops), 1)
+
+    def test_user_close_request_uses_graceful_quit_without_release(self):
+        target = AedtTarget("port", 50051)
+        self.backend.execute(target, "ping", {})
+
+        self.assertTrue(self.backend.close_for_user_request())
+
+        self.assertEqual(self.desktops[0].quit_calls, 1)
+        self.assertEqual(self.desktops[0].releases, [])
+        self.assertIsNone(self.backend.session_pid)
 
     def test_ping_handles_project_without_design(self):
         desktop = FakeDesktop(aedt_process_id=1234)

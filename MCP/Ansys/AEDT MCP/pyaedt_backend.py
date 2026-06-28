@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
+import threading
 from typing import Any
 
 from aedt_target import AedtTarget
@@ -100,8 +101,18 @@ class PyAedtBackend:
         self._desktop: Any = None
         self._bound_target: AedtTarget | None = None
         self._apps: dict[tuple[str, str, str | None], Any] = {}
+        self._lock = threading.RLock()
 
     def execute(
+        self,
+        target: AedtTarget,
+        command: str,
+        arguments: Mapping[str, Any] | None,
+    ) -> dict[str, Any]:
+        with self._lock:
+            return self._execute(target, command, arguments)
+
+    def _execute(
         self,
         target: AedtTarget,
         command: str,
@@ -119,13 +130,33 @@ class PyAedtBackend:
         return self._execute_hfss(target, command, arguments)
 
     def release(self) -> bool:
-        if self._desktop is None:
-            return False
-        desktop = self._desktop
-        self._apps.clear()
-        self._desktop = None
-        self._bound_target = None
-        return _release(desktop)
+        with self._lock:
+            if self._desktop is None:
+                return False
+            desktop = self._desktop
+            self._apps.clear()
+            self._desktop = None
+            self._bound_target = None
+            return _release(desktop)
+
+    @property
+    def session_pid(self) -> int | None:
+        with self._lock:
+            if self._desktop is None:
+                return None
+            pid = getattr(self._desktop, "aedt_process_id", None)
+            return pid if type(pid) is int and pid > 0 else None
+
+    def close_for_user_request(self) -> bool:
+        with self._lock:
+            if self._desktop is None:
+                return False
+            desktop = self._desktop
+            self._apps.clear()
+            self._desktop = None
+            self._bound_target = None
+            desktop.odesktop.QuitApplication()
+            return True
 
     def _desktop_for(self, target: AedtTarget) -> Any:
         if self._desktop is None:

@@ -1,6 +1,6 @@
 # Finite Element Simulation Skills
 
-This directory keeps finite element simulation skills grouped under `abaqus/`.
+This directory keeps reusable CAE simulation skills grouped by solver or domain.
 
 The current layout is:
 
@@ -14,7 +14,9 @@ The current layout is:
 | `abaqus/postprocessing` | ODB/result post-processing skills. |
 | `abaqus/optimization` | Topology, shape, and general optimization skills. |
 | `abaqus/reference` | General FEA and FEniCS reference skills that are useful beside Abaqus workflows. |
+| `CST` | CST Studio Suite electromagnetic simulation workflow skills for use with the CST MCP. |
 
 See [abaqus/README.md](abaqus/README.md) for the full skill index, upstream attribution, and client setup examples.
+See [CST/README.md](CST/README.md) for CST workflow skills.
 
 Chinese version: [README.zh-CN.md](README.zh-CN.md).

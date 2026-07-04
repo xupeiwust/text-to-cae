@@ -1,6 +1,6 @@
 # 有限元仿真 Skills
 
-这个目录下的有限元仿真 skills 已统一归到 `abaqus/` 文件夹中。
+这个目录下的可复用 CAE 仿真 skills 按求解器或领域分组。
 
 当前结构：
 
@@ -14,7 +14,9 @@
 | `abaqus/postprocessing` | ODB/结果后处理 skills。 |
 | `abaqus/optimization` | 拓扑优化、形状优化和通用优化 skills。 |
 | `abaqus/reference` | 可配合 Abaqus 使用的通用 FEA 和 FEniCS 参考 skills。 |
+| `CST` | 配合 CST MCP 使用的 CST Studio Suite 电磁仿真流程 skills。 |
 
 完整索引、上游来源和客户端使用方法见 [abaqus/README.zh-CN.md](abaqus/README.zh-CN.md)。
+CST workflow skills 见 [CST/README.zh-CN.md](CST/README.zh-CN.md)。
 
 English version: [README.md](README.md).

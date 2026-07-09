@@ -22,9 +22,43 @@ class FakeModel3D:
         self.solver_runs += 1
 
 
+class FakeSimulationTask:
+    def __init__(self):
+        self.names = []
+        self.updates = 0
+
+    def Reset(self):
+        pass
+
+    def Name(self, name):
+        self.names.append(name)
+
+    def Update(self):
+        self.updates += 1
+
+
+class FakeSchematic:
+    def __init__(self):
+        self.vba = []
+        self.update_results = 0
+        self.exports = []
+        self.SimulationTask = FakeSimulationTask()
+
+    def execute_vba_code(self, code):
+        self.vba.append(code)
+
+    def UpdateResults(self):
+        self.update_results += 1
+
+    def TouchstoneExport(self, tree_item, filename, impedance):
+        self.exports.append((tree_item, filename, impedance))
+        return True
+
+
 class FakeProject:
     def __init__(self):
         self.model3d = FakeModel3D()
+        self.schematic = FakeSchematic()
         self.saved = []
 
     def filename(self):
@@ -72,6 +106,30 @@ class CSTAutomationTests(unittest.TestCase):
         manager.execute_vba('Solver.FrequencyRange "1", "2"')
 
         self.assertEqual(manager.project.model3d.vba, ['Sub Main\nSolver.FrequencyRange "1", "2"\nEnd Sub'])
+
+    def test_schematic_execute_vba_wraps_code_in_sub_main(self):
+        manager = self.manager_with_project()
+
+        manager.schematic_execute_vba('ReportInformationToWindow "x"')
+
+        self.assertEqual(manager.project.schematic.vba, ['Sub Main\nReportInformationToWindow "x"\nEnd Sub'])
+
+    def test_schematic_run_simulation_updates_named_task(self):
+        manager = self.manager_with_project()
+
+        result = manager.schematic_run_simulation(task_name="SPara1")
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(manager.project.schematic.SimulationTask.names, ["SPara1"])
+        self.assertEqual(manager.project.schematic.SimulationTask.updates, 1)
+
+    def test_schematic_export_touchstone_calls_ds_export(self):
+        manager = self.manager_with_project()
+
+        result = manager.schematic_export_touchstone("Tasks\\SPara1\\S-Parameters", r"C:\tmp\out", 50)
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(manager.project.schematic.exports, [("Tasks\\SPara1\\S-Parameters", r"C:\tmp\out", "50")])
 
     def test_run_solver_calls_model3d(self):
         manager = self.manager_with_project()

@@ -16,6 +16,71 @@ This directory contains an MCP server for CST Studio Suite 2026. It uses CST's b
 - Call the vendored `bbl21/cst-runtime-cli` toolset through `cst_runtime_*` MCP wrappers
 - Preview and run parameter sweeps with per-case projects, CSV summaries, optional solves, Touchstone export, and 1D result export
 - Generate schema-driven Python typed wrappers for the vendored toolbox commands
+- Create and control CST Design Studio/Schematic projects for circuit and field/circuit workflows
+- Insert Touchstone N-port blocks, add R/L/C/diode/ground/external ports, connect schematic nets, run S-parameter circuit tasks, and export schematic S-parameters or derived SE/IL CSV data
+
+## Verified Design Studio / Schematic Support
+
+The Schematic layer uses CST Design Studio's `project.schematic` automation object. On this machine with CST Studio Suite 2026.1, the following calls were live-tested:
+
+- `DesignEnvironment.new_ds()` creates a Design Studio project.
+- `project.schematic.execute_vba_code(...)` creates and configures schematic objects.
+- `Block`, `ExternalPort`, `Net`, `SimulationTask`, `DSParameterSweep`, `TouchstoneExport`, and `ResultTree` are exposed by CST's Python/VBA automation.
+- RLC values can be set with `Block.SetDoubleProperty("Resistance"|"Capacitance"|"Inductance", ...)`.
+- Schematic S-parameter tasks can be run through `SimulationTask.Update()`.
+- Results can be read through `cst.results.ProjectFile(...).get_schematic()`.
+
+New native MCP tools include:
+
+- `cst_create_schematic_project_tool`
+- `cst_open_schematic_project_tool`
+- `cst_schematic_execute_vba_tool`
+- `cst_schematic_add_to_history_tool`
+- `cst_insert_em_3d_block_or_nport_tool`
+- `cst_add_resistor_tool`
+- `cst_add_inductor_tool`
+- `cst_add_capacitor_tool`
+- `cst_add_diode_spice_model_tool`
+- `cst_add_ground_tool`
+- `cst_add_external_port_tool`
+- `cst_connect_schematic_nodes_tool`
+- `cst_configure_frequency_sweep_tool`
+- `cst_configure_power_sweep_tool`
+- `cst_run_circuit_cosimulation_tool`
+- `cst_export_schematic_sparameters_tool`
+- `cst_export_se_il_vs_power_tool`
+
+Current verified demo:
+
+```powershell
+cd E:\Code\CAE-Agent-Hub\MCP\CST
+.\.venv\Scripts\python.exe .\examples\design_studio_cosim_demo.py
+```
+
+The demo creates:
+
+- a Design Studio circuit with two external ports, `0.35 nH`, `0.07 pF`, `39 nH`, a diode, `100 Ohm`, and ground;
+- an `SPara1` task from 1 GHz to 10 GHz with 91 samples;
+- a saved `.cst` project;
+- schematic result tree entries for `S1,1`, `S1,2`, `S2,1`, and `S2,2`;
+- a Touchstone `.s2p` export;
+- an SE/IL CSV derived from `S2,1`;
+- a second Design Studio project that inserts the first `.s2p` as a Touchstone N-port block, connects it to external ports, runs `SPara1`, and exports another `.s2p`.
+
+Latest verified evidence from the local run:
+
+- `E:\Code\CAE-Agent-Hub\MCP\CST\examples\design_studio_cosim_demo_run\fss_rlc_diode_schematic_demo_1783569136.cst`
+- `E:\Code\CAE-Agent-Hub\MCP\CST\examples\design_studio_cosim_demo_run\fss_rlc_diode_schematic_demo_1783569136_demo_log.json`
+- `E:\Code\CAE-Agent-Hub\MCP\CST\examples\design_studio_cosim_demo_run\fss_rlc_diode_schematic_demo_1783569136_schematic_sparameters.s2p`
+- `E:\Code\CAE-Agent-Hub\MCP\CST\examples\design_studio_cosim_demo_run\fss_rlc_diode_schematic_demo_1783569136_se_il.csv`
+- `E:\Code\CAE-Agent-Hub\MCP\CST\examples\design_studio_cosim_demo_run\touchstone_nport_block_demo_1783569178.cst`
+- `E:\Code\CAE-Agent-Hub\MCP\CST\examples\design_studio_cosim_demo_run\touchstone_nport_block_demo_1783569178_sparameters.s2p`
+
+Experimental or workflow-dependent:
+
+- Direct insertion of a CST Microwave Studio 3D project block is exposed through `cst_insert_em_3d_block_or_nport_tool` with `block_type="mws_file"` or `block_type="simulation_project_reference"`, but the verified minimal bridge is currently Touchstone `.sNp`.
+- `cst_configure_power_sweep_tool` creates a generic Design Studio parameter sweep. The schematic must already use that parameter in a source, port, incident-field, or nonlinear model expression before it represents a physical input-power or field-strength sweep.
+- Full nonlinear field/circuit co-simulation with incident-field sweeps is expected to need a case-specific 3D template and recorded CST macro snippets.
 
 ## Codex Configuration
 
@@ -43,6 +108,18 @@ If you use CST's bundled Python directly, install the complete MCP dependency se
 7. `cst_run_solver_tool`
 8. `cst_list_results_tool`
 9. `cst_read_1d_result_tool`
+
+For Design Studio/Schematic workflows, use:
+
+1. `cst_create_schematic_project_tool` or `cst_open_schematic_project_tool`
+2. `cst_add_external_port_tool`
+3. `cst_insert_em_3d_block_or_nport_tool` for Touchstone or EM blocks
+4. `cst_add_resistor_tool`, `cst_add_inductor_tool`, `cst_add_capacitor_tool`, `cst_add_diode_spice_model_tool`, and `cst_add_ground_tool`
+5. `cst_connect_schematic_nodes_tool`
+6. `cst_configure_frequency_sweep_tool`
+7. `cst_run_circuit_cosimulation_tool`
+8. `cst_list_results_tool` with `module="schematic"`
+9. `cst_export_schematic_sparameters_tool` or `cst_export_se_il_vs_power_tool`
 
 ## Vendored cst-runtime-cli Tools
 

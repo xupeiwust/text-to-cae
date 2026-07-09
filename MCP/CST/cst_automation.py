@@ -8,6 +8,8 @@ import os
 from pathlib import Path
 from typing import Any
 
+from cst_schematic import SchematicEndpoint, wrap_sub_main
+
 
 DEFAULT_CST_EXE = r"G:\Program Files\CST Studio Suite 2026\AMD64\CST DESIGN ENVIRONMENT_AMD64.exe"
 DEFAULT_CST_ROOT = r"G:\Program Files\CST Studio Suite 2026"
@@ -246,6 +248,62 @@ class CSTSessionManager:
             prj.save()
         return self.get_project_info()
 
+    def _require_schematic(self) -> Any:
+        prj = self._require_project()
+        schematic = getattr(prj, "schematic", None)
+        if schematic is None:
+            raise RuntimeError("Active CST project does not expose a Design Studio schematic interface.")
+        return schematic
+
+    def new_schematic_project(self, path: str | None = None) -> dict[str, Any]:
+        self.new_project(project_type="ds")
+        if path and path.strip():
+            self.save_project(path=path)
+        return self.get_project_info()
+
+    def schematic_add_to_history(self, title: str, vba_code: str) -> dict[str, Any]:
+        # CST Design Studio does not expose a history tree like 3D modeling; execute
+        # a named VBA macro and report the title through the DS message window.
+        if not title.strip():
+            raise ValueError("title must not be empty")
+        code = f'ReportInformationToWindow("MCP schematic step: {title.strip()}")\n{vba_code}'
+        return self.schematic_execute_vba(code)
+
+    def schematic_execute_vba(self, vba_code: str) -> dict[str, Any]:
+        schematic = self._require_schematic()
+        code = wrap_sub_main(vba_code)
+        schematic.execute_vba_code(code)
+        return {"ok": True}
+
+    def schematic_run_simulation(self, task_name: str | None = None) -> dict[str, Any]:
+        schematic = self._require_schematic()
+        if task_name and task_name.strip():
+            schematic.SimulationTask.Reset()
+            schematic.SimulationTask.Name(task_name.strip())
+            schematic.SimulationTask.Update()
+        else:
+            schematic.UpdateResults()
+        return {"ok": True, "project": self._project_metadata(self._require_project())}
+
+    def schematic_export_touchstone(
+        self,
+        tree_item: str,
+        filename_without_extension: str,
+        impedance: float | str = 50.0,
+    ) -> dict[str, Any]:
+        if not tree_item.strip():
+            raise ValueError("tree_item must not be empty")
+        if not filename_without_extension.strip():
+            raise ValueError("filename_without_extension must not be empty")
+        schematic = self._require_schematic()
+        ok = schematic.TouchstoneExport(tree_item.strip(), filename_without_extension.strip(), str(impedance))
+        return {
+            "ok": bool(ok),
+            "tree_item": tree_item.strip(),
+            "filename_without_extension": filename_without_extension.strip(),
+            "impedance": str(impedance),
+        }
+
     def add_to_history(self, title: str, vba_code: str) -> dict[str, Any]:
         if not title.strip():
             raise ValueError("title must not be empty")
@@ -282,6 +340,8 @@ class CSTSessionManager:
         }
         if self.project is not None:
             namespace["model3d"] = getattr(self.project, "model3d", None)
+            namespace["schematic"] = getattr(self.project, "schematic", None)
+            namespace["SchematicEndpoint"] = SchematicEndpoint
         try:
             with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
                 exec(compile(code, "<cst-mcp-run-python>", "exec"), namespace, namespace)

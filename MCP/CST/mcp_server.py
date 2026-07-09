@@ -7,6 +7,7 @@ from mcp.server.fastmcp import FastMCP
 
 from cst_automation import CSTSessionManager, dumps
 from cst_parameter_sweep import CSTParameterSweepRunner, preview_sweep
+from cst_schematic import CSTSchematicVBA, SchematicEndpoint
 from cst_runtime_cli_bridge import (
     describe_runtime_tool,
     detect_runtime,
@@ -152,6 +153,285 @@ def cst_export_touchstone_tool(
         data_format=data_format,
         frequency_range=frequency_range,
     )
+
+
+@mcp.tool()
+def cst_create_schematic_project_tool(path: str | None = None) -> dict[str, Any]:
+    """Create a CST Design Studio/Schematic project and optionally save it to a .cst path."""
+    return session.new_schematic_project(path=path)
+
+
+@mcp.tool()
+def cst_open_schematic_project_tool(path: str) -> dict[str, Any]:
+    """Open a CST Design Studio/Schematic .cst project."""
+    return session.open_project(path)
+
+
+@mcp.tool()
+def cst_schematic_execute_vba_tool(vba_code: str) -> dict[str, Any]:
+    """Execute CST Design Studio/Schematic VBA code. A Sub Main wrapper is added if absent."""
+    return session.schematic_execute_vba(vba_code=vba_code)
+
+
+@mcp.tool()
+def cst_schematic_add_to_history_tool(title: str, vba_code: str) -> dict[str, Any]:
+    """Execute a named CST Design Studio/Schematic VBA step and write a message to the DS log."""
+    return session.schematic_add_to_history(title=title, vba_code=vba_code)
+
+
+@mcp.tool()
+def cst_insert_em_3d_block_or_nport_tool(
+    name: str,
+    file_path: str,
+    block_type: str = "touchstone",
+    x: int = 50000,
+    y: int = 50000,
+    relative_path: bool = False,
+    cache_files: bool | None = None,
+    simulation_task: str | None = None,
+) -> dict[str, Any]:
+    """Insert an N-port/EM block into Design Studio.
+
+    block_type can be touchstone, mws_file, mws, or simulation_project_reference.
+    Touchstone is the verified minimal co-simulation bridge for exported 3D S-parameters.
+    """
+    code = CSTSchematicVBA.block(
+        name=name,
+        block_type=block_type,
+        x=x,
+        y=y,
+        file_path=file_path,
+        relative_path=relative_path,
+        cache_files=cache_files,
+        simulation_task=simulation_task,
+    )
+    return session.schematic_add_to_history(title=f"insert schematic block {name}", vba_code=code)
+
+
+@mcp.tool()
+def cst_add_resistor_tool(name: str, resistance: float | str, unit: str = "Ohm", x: int = 50000, y: int = 50000) -> dict[str, Any]:
+    """Add a Design Studio resistor block."""
+    return session.schematic_add_to_history(
+        title=f"add resistor {name}",
+        vba_code=CSTSchematicVBA.resistor(name=name, resistance=resistance, unit=unit, x=x, y=y),
+    )
+
+
+@mcp.tool()
+def cst_add_inductor_tool(name: str, inductance: float | str, unit: str = "nH", x: int = 50000, y: int = 50000) -> dict[str, Any]:
+    """Add a Design Studio inductor block."""
+    return session.schematic_add_to_history(
+        title=f"add inductor {name}",
+        vba_code=CSTSchematicVBA.inductor(name=name, inductance=inductance, unit=unit, x=x, y=y),
+    )
+
+
+@mcp.tool()
+def cst_add_capacitor_tool(name: str, capacitance: float | str, unit: str = "pF", x: int = 50000, y: int = 50000) -> dict[str, Any]:
+    """Add a Design Studio capacitor block."""
+    return session.schematic_add_to_history(
+        title=f"add capacitor {name}",
+        vba_code=CSTSchematicVBA.capacitor(name=name, capacitance=capacitance, unit=unit, x=x, y=y),
+    )
+
+
+@mcp.tool()
+def cst_add_diode_spice_model_tool(
+    spice_netlist: str | None = None,
+    subcircuit_name: str = "",
+    dialect: str = "Combined",
+    name: str = "D1",
+    x: int = 50000,
+    y: int = 50000,
+) -> dict[str, Any]:
+    """Add a diode, or import a SPICE diode/subcircuit model into Design Studio."""
+    if spice_netlist and spice_netlist.strip():
+        code = CSTSchematicVBA.import_spice_model(
+            spice_netlist=spice_netlist,
+            subcircuit_name=subcircuit_name,
+            dialect=dialect,
+        )
+        title = "import diode spice model"
+    else:
+        code = CSTSchematicVBA.diode(name=name, x=x, y=y)
+        title = f"add diode {name}"
+    return session.schematic_add_to_history(title=title, vba_code=code)
+
+
+@mcp.tool()
+def cst_add_ground_tool(name: str = "GND1", x: int = 50000, y: int = 50000) -> dict[str, Any]:
+    """Add a Design Studio ground block."""
+    return session.schematic_add_to_history(
+        title=f"add ground {name}",
+        vba_code=CSTSchematicVBA.ground(name=name, x=x, y=y),
+    )
+
+
+@mcp.tool()
+def cst_add_external_port_tool(
+    name: str,
+    x: int = 50000,
+    y: int = 50000,
+    label: str | None = None,
+    rotation: int | float = 0,
+    number_of_ports: int | None = None,
+    differential: bool | None = None,
+    common_reference: bool | None = None,
+) -> dict[str, Any]:
+    """Add a Design Studio external port."""
+    return session.schematic_add_to_history(
+        title=f"add external port {name}",
+        vba_code=CSTSchematicVBA.external_port(
+            name=name,
+            x=x,
+            y=y,
+            label=label,
+            rotation=rotation,
+            number_of_ports=number_of_ports,
+            differential=differential,
+            common_reference=common_reference,
+        ),
+    )
+
+
+@mcp.tool()
+def cst_connect_schematic_nodes_tool(
+    endpoints: list[dict[str, Any]],
+    net_name: str = "",
+    create_new_subnet: bool = False,
+) -> dict[str, Any]:
+    """Connect Design Studio component ports.
+
+    Each endpoint is {"component_type": "BLOCK"|"Externalport", "name": "...", "port_index": 0}.
+    """
+    parsed = [SchematicEndpoint.from_dict(endpoint) for endpoint in endpoints]
+    return session.schematic_add_to_history(
+        title="connect schematic nodes",
+        vba_code=CSTSchematicVBA.connect(parsed, net_name=net_name, create_new_subnet=create_new_subnet),
+    )
+
+
+@mcp.tool()
+def cst_configure_frequency_sweep_tool(
+    task_name: str = "SPara1",
+    fmin: float | str = 0.0,
+    fmax: float | str = 10.0,
+    samples: int = 101,
+    unit: str = "GHz",
+    circuit_simulator: str = "cst",
+    broadband_sweep: bool = False,
+) -> dict[str, Any]:
+    """Create or update a Design Studio S-parameter frequency sweep task."""
+    return session.schematic_add_to_history(
+        title=f"configure frequency sweep {task_name}",
+        vba_code=CSTSchematicVBA.frequency_sweep(
+            task_name=task_name,
+            fmin=fmin,
+            fmax=fmax,
+            samples=samples,
+            unit=unit,
+            circuit_simulator=circuit_simulator,
+            broadband_sweep=broadband_sweep,
+        ),
+    )
+
+
+@mcp.tool()
+def cst_configure_power_sweep_tool(
+    parameter_name: str = "input_power_dbm",
+    points: list[float | int | str] | None = None,
+    sweep_task_name: str = "PowerSweep1",
+    sequence_name: str = "Power",
+    simulation_type: str = "",
+    start: bool = False,
+) -> dict[str, Any]:
+    """Configure a Design Studio parameter sweep for input power or incident-field parameters.
+
+    This is a generic sweep wrapper. The model must use parameter_name in the relevant source,
+    port, or circuit expression before running.
+    """
+    values = points if points is not None else [-20, -10, 0, 10]
+    return session.schematic_add_to_history(
+        title=f"configure parameter sweep {sweep_task_name}",
+        vba_code=CSTSchematicVBA.parameter_sweep(
+            sweep_task_name=sweep_task_name,
+            sequence_name=sequence_name,
+            parameter_name=parameter_name,
+            points=values,
+            simulation_type=simulation_type,
+            start=start,
+        ),
+    )
+
+
+@mcp.tool()
+def cst_run_circuit_cosimulation_tool(task_name: str | None = None) -> dict[str, Any]:
+    """Run a Design Studio circuit/co-simulation task or update all schematic results."""
+    return session.schematic_run_simulation(task_name=task_name)
+
+
+@mcp.tool()
+def cst_export_schematic_sparameters_tool(
+    tree_item: str,
+    filename_without_extension: str,
+    impedance: float | str = 50.0,
+) -> dict[str, Any]:
+    """Export a Design Studio S/Y/Z-parameter result tree item to Touchstone."""
+    return session.schematic_export_touchstone(
+        tree_item=tree_item,
+        filename_without_extension=filename_without_extension,
+        impedance=impedance,
+    )
+
+
+@mcp.tool()
+def cst_export_se_il_vs_power_tool(
+    output_csv: str,
+    s21_tree_path: str,
+    cst_file: str | None = None,
+    power_values: list[float | int | str] | None = None,
+    max_points: int = 2000,
+) -> dict[str, Any]:
+    """Export an SE/IL CSV from a schematic S21 result.
+
+    SE/IL is computed as -20*log10(abs(S21)). power_values can be supplied when
+    the selected tree item is one curve per power setting.
+    """
+    import csv
+    import math
+    from pathlib import Path
+
+    result = session.read_1d_result(
+        tree_path=s21_tree_path,
+        cst_file=cst_file,
+        module="schematic",
+        max_points=max_points,
+    )
+    rows = []
+    for index, row in enumerate(result["data"]):
+        frequency = row[0]
+        value = row[1]
+        if isinstance(value, (list, tuple)) and len(value) >= 2:
+            magnitude = math.hypot(float(value[0]), float(value[1]))
+        else:
+            magnitude = abs(complex(value))
+        se_il_db = -20.0 * math.log10(max(magnitude, 1e-300))
+        rows.append(
+            {
+                "index": index,
+                "frequency": frequency,
+                "power": power_values[index] if power_values and index < len(power_values) else "",
+                "s21_magnitude": magnitude,
+                "se_il_db": se_il_db,
+            }
+        )
+    target = Path(output_csv)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with target.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=["index", "frequency", "power", "s21_magnitude", "se_il_db"])
+        writer.writeheader()
+        writer.writerows(rows)
+    return {"ok": True, "output_csv": str(target), "rows": len(rows), "source": result}
 
 
 @mcp.tool()

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<extension version="2026" minorversion="1" name="WorkbenchMCP">
+<extension version="2026" minorversion="1" name="WorkbenchMCP" loadAsDefault="true">
   <guid shortid="WorkbenchMCP">9f2d1d85-97a3-4e23-82f7-c7a8d25a2f31</guid>
   <author>Text-to-CAE</author>
   <description>MCP queue and socket bridge for ANSYS Mechanical.</description>
